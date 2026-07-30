@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		99638C50588EE2250D7265D7 /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403B729EABDE2C69CD52D1C0 /* KeyboardViewController.swift */; };
+		BD0A5FD32803881CA17B7DEC /* KeyboardHeightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D4A53F563947B528BCE908 /* KeyboardHeightTests.swift */; };
 		D098B6C6760377071DCF40D5 /* BigKeysApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D0A82554924F1658C861E7 /* BigKeysApp.swift */; };
 		D410A13770C140F1152B1462 /* BigKeysKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CECCBF22BC051903966AC42C /* BigKeysKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -19,6 +20,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 4187997E29C5E23A61644BA5;
 			remoteInfo = BigKeysKeyboard;
+		};
+		B37A2180A9B81B331D54EC83 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8791FA9460A848C274E7736B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 442C647F7B7C6EB2AA0C9C1B;
+			remoteInfo = BigKeys;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -37,11 +45,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		33F0303FA60BE7B030656F3C /* BigKeysUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BigKeysUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		403B729EABDE2C69CD52D1C0 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
 		75BC06D41488807AE1F6EC22 /* BigKeys.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BigKeys.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB710CD4CA71312AFA731698 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CECCBF22BC051903966AC42C /* BigKeysKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BigKeysKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2D0A82554924F1658C861E7 /* BigKeysApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigKeysApp.swift; sourceTree = "<group>"; };
+		F7D4A53F563947B528BCE908 /* KeyboardHeightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHeightTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -50,6 +60,7 @@
 			children = (
 				EDFA992565860B0A8F507F59 /* App */,
 				7C053D574488BB7AF1B5E5F5 /* Keyboard */,
+				812C5972A16F25F9E66A4702 /* UITests */,
 				C66B48F3785E1ABCEE1EC049 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,11 +74,20 @@
 			path = Keyboard;
 			sourceTree = "<group>";
 		};
+		812C5972A16F25F9E66A4702 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				F7D4A53F563947B528BCE908 /* KeyboardHeightTests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		C66B48F3785E1ABCEE1EC049 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				75BC06D41488807AE1F6EC22 /* BigKeys.app */,
 				CECCBF22BC051903966AC42C /* BigKeysKeyboard.appex */,
+				33F0303FA60BE7B030656F3C /* BigKeysUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -119,6 +139,24 @@
 			productReference = 75BC06D41488807AE1F6EC22 /* BigKeys.app */;
 			productType = "com.apple.product-type.application";
 		};
+		52D2EE61B018FE467A4B78D8 /* BigKeysUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DB561695C4AF43666204928D /* Build configuration list for PBXNativeTarget "BigKeysUITests" */;
+			buildPhases = (
+				6EA753C629872023E5E99B40 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BA910AA8D63E9C919275D940 /* PBXTargetDependency */,
+			);
+			name = BigKeysUITests;
+			packageProductDependencies = (
+			);
+			productName = BigKeysUITests;
+			productReference = 33F0303FA60BE7B030656F3C /* BigKeysUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -135,6 +173,11 @@
 					442C647F7B7C6EB2AA0C9C1B = {
 						DevelopmentTeam = Y7ZZ5G2T3Y;
 						ProvisioningStyle = Automatic;
+					};
+					52D2EE61B018FE467A4B78D8 = {
+						DevelopmentTeam = Y7ZZ5G2T3Y;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 442C647F7B7C6EB2AA0C9C1B;
 					};
 				};
 			};
@@ -154,11 +197,20 @@
 			targets = (
 				442C647F7B7C6EB2AA0C9C1B /* BigKeys */,
 				4187997E29C5E23A61644BA5 /* BigKeysKeyboard */,
+				52D2EE61B018FE467A4B78D8 /* BigKeysUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
+		6EA753C629872023E5E99B40 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BD0A5FD32803881CA17B7DEC /* KeyboardHeightTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C5B87843B84F7A2B9AC4331A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -183,9 +235,30 @@
 			target = 4187997E29C5E23A61644BA5 /* BigKeysKeyboard */;
 			targetProxy = 6FEF25F96C52135339ABF786 /* PBXContainerItemProxy */;
 		};
+		BA910AA8D63E9C919275D940 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 442C647F7B7C6EB2AA0C9C1B /* BigKeys */;
+			targetProxy = B37A2180A9B81B331D54EC83 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		272DDB1771E926FD802EEF44 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.asadullokh.ch5.bigkeys.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BigKeys;
+			};
+			name = Debug;
+		};
 		2AB1AA1C7E2135BF67EA3F6C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -269,6 +342,22 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
+		};
+		78A4B697B58FB2AE865D4F50 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.asadullokh.ch5.bigkeys.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BigKeys;
+			};
+			name = Release;
 		};
 		96AD5BDE0958392E8D8264B1 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -402,6 +491,15 @@
 			buildConfigurations = (
 				96AD5BDE0958392E8D8264B1 /* Debug */,
 				2AB1AA1C7E2135BF67EA3F6C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DB561695C4AF43666204928D /* Build configuration list for PBXNativeTarget "BigKeysUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				272DDB1771E926FD802EEF44 /* Debug */,
+				78A4B697B58FB2AE865D4F50 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

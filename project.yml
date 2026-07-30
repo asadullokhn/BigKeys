@@ -27,6 +27,16 @@ targets:
     dependencies:
       - target: BigKeysKeyboard
         embed: true
+  BigKeysUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: BigKeys
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys.uitests
+        TEST_TARGET_NAME: BigKeys
   BigKeysKeyboard:
     type: app-extension
     platform: iOS
@@ -46,3 +56,12 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys.keyboard
+schemes:
+  BigKeys:
+    build:
+      targets:
+        BigKeys: all
+        BigKeysUITests: [test]
+    test:
+      targets:
+        - BigKeysUITests
