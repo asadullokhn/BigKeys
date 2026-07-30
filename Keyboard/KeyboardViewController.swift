@@ -300,7 +300,10 @@ final class KeyboardViewController: UIInputViewController {
         heightConstraint = NSLayoutConstraint(
             item: view!, attribute: .height, relatedBy: .equal,
             toItem: nil, attribute: .notAnAttribute, multiplier: 1, constant: sizePresets[sizeIndex])
-        heightConstraint.priority = .init(999)
+        // Required, not 999: with allowsSelfSizing the system sizes the
+        // window from this constraint, and a sub-required priority gets
+        // out-prioritized after rotation, leaving a stale oversized window.
+        heightConstraint.priority = .required
         view.addConstraint(heightConstraint)
         // Make the system respect our height constraint for the keyboard
         // window itself — without this, rotation can leave the container
@@ -338,13 +341,12 @@ final class KeyboardViewController: UIInputViewController {
             pendingHeightFix = true
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.view.removeConstraint(self.heightConstraint)
-                self.heightConstraint = NSLayoutConstraint(
-                    item: self.view!, attribute: .height, relatedBy: .equal,
-                    toItem: nil, attribute: .notAnAttribute, multiplier: 1,
-                    constant: self.sizePresets[self.sizeIndex])
-                self.heightConstraint.priority = .init(999)
-                self.view.addConstraint(self.heightConstraint)
+                // A genuine value change — same-value updates are no-ops to
+                // the layout engine and never shrink the stale window.
+                self.heightConstraint.constant = self.sizePresets[self.sizeIndex] - 2
+                self.view.setNeedsLayout()
+                self.view.layoutIfNeeded()
+                self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
                 self.view.setNeedsLayout()
                 self.view.layoutIfNeeded()
                 self.pendingHeightFix = false
@@ -422,9 +424,12 @@ final class KeyboardViewController: UIInputViewController {
                     : "Words you use often will appear here — tap to go to Core"
                 wordRows.append([(.category(1), hint)])
             }
+            // No space or character-delete here: words insert their own
+            // spacing, and character-level fixing belongs to the letter
+            // layer — fewer keys means bigger targets.
             wordRows.append([
-                (.toLetters, "abc"), (.space, lang == .ms ? "jarak" : "space"),
-                (.deleteWord, lang == .ms ? "⌫ kata" : "⌫ word"), (.delete, "⌫"),
+                (.toLetters, "abc"),
+                (.deleteWord, lang == .ms ? "⌫ kata" : "⌫ word"),
                 (.ret, "return"), (.language, lang == .en ? "EN" : "MS"),
                 (.size, "⤢"), (.dismiss, "⌄"),
             ])
@@ -625,7 +630,7 @@ final class KeyboardViewController: UIInputViewController {
 
             for (colIdx, item) in row.enumerated() {
                 var width = available / CGFloat(row.count)
-                if isBottomRow && row.count > 1 {
+                if isBottomRow && row.count > 1 && row.contains(where: { $0.0 == .space }) {
                     let spaceShare: CGFloat = isCompact ? 0.25 : 0.4
                     let otherShare = (1 - spaceShare) / CGFloat(row.count - 1)
                     width = available * (item.0 == .space ? spaceShare : otherShare)
