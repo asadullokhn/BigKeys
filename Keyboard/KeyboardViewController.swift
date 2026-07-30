@@ -246,7 +246,8 @@ final class KeyboardViewController: UIInputViewController {
     // the grid drops to compact mode instead of breaking.
     private let sizePresets: [CGFloat] = [280, 360, 440]
     private var sizeIndex = 2
-    private var heightConstraint: NSLayoutConstraint!
+    private var heightConstraint: NSLayoutConstraint?
+    private var healAttempts = 0
     private var lastCompact = false
     private let topBarHeight: CGFloat = 56
     private let debounceInterval: TimeInterval = 0.5
@@ -297,19 +298,6 @@ final class KeyboardViewController: UIInputViewController {
             sizeIndex = min(max(UserDefaults.standard.integer(forKey: "sizeIndex"), 0), sizePresets.count - 1)
         }
 
-        heightConstraint = NSLayoutConstraint(
-            item: view!, attribute: .height, relatedBy: .equal,
-            toItem: nil, attribute: .notAnAttribute, multiplier: 1, constant: sizePresets[sizeIndex])
-        // Required, not 999: with allowsSelfSizing the system sizes the
-        // window from this constraint, and a sub-required priority gets
-        // out-prioritized after rotation, leaving a stale oversized window.
-        heightConstraint.priority = .required
-        view.addConstraint(heightConstraint)
-        // Make the system respect our height constraint for the keyboard
-        // window itself — without this, rotation can leave the container
-        // at a stale system-chosen height that our 999-priority loses to.
-        inputView?.allowsSelfSizing = true
-
         trackingView.frame = view.bounds
         trackingView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         trackingView.isMultipleTouchEnabled = false
@@ -321,6 +309,25 @@ final class KeyboardViewController: UIInputViewController {
 
         buildSuggestionBar()
         buildKeys()
+    }
+
+    // Canonical placement per Apple's Custom Keyboard guide: the height
+    // constraint goes in AFTER the view is in the hierarchy, never in
+    // viewDidLoad, at sub-required priority so the system's own window
+    // constraints are never contradicted.
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        if let constraint = heightConstraint {
+            constraint.constant = sizePresets[sizeIndex]
+        } else {
+            let constraint = NSLayoutConstraint(
+                item: view!, attribute: .height, relatedBy: .equal,
+                toItem: nil, attribute: .notAnAttribute, multiplier: 1,
+                constant: sizePresets[sizeIndex])
+            constraint.priority = .init(999)
+            view.addConstraint(constraint)
+            heightConstraint = constraint
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -337,16 +344,17 @@ final class KeyboardViewController: UIInputViewController {
         // settled, rebuild the height constraint from scratch — reasserting
         // the existing one is not always enough to shrink the window.
         let drift = view.bounds.height - sizePresets[sizeIndex]
-        if !isRotating, !pendingHeightFix, drift > 1 {
+        if !isRotating, !pendingHeightFix, drift > 1, healAttempts < 2, heightConstraint != nil {
             pendingHeightFix = true
+            healAttempts += 1
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard let self, let constraint = self.heightConstraint else { return }
                 // A genuine value change — same-value updates are no-ops to
                 // the layout engine and never shrink the stale window.
-                self.heightConstraint.constant = self.sizePresets[self.sizeIndex] - 2
+                constraint.constant = self.sizePresets[self.sizeIndex] - 2
                 self.view.setNeedsLayout()
                 self.view.layoutIfNeeded()
-                self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
+                constraint.constant = self.sizePresets[self.sizeIndex]
                 self.view.setNeedsLayout()
                 self.view.layoutIfNeeded()
                 self.pendingHeightFix = false
@@ -360,17 +368,12 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         isRotating = true
+        healAttempts = 0
         coordinator.animate(alongsideTransition: { _ in
-            self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
+            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
             self.view.setNeedsLayout()
         }, completion: { _ in
-            // Nudge the constant so the system re-reads the constraint —
-            // reasserting the same value after rotation is silently ignored
-            // when the container kept a stale height.
-            self.heightConstraint.constant = self.sizePresets[self.sizeIndex] - 1
-            self.view.setNeedsLayout()
-            self.view.layoutIfNeeded()
-            self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
+            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
             self.view.setNeedsLayout()
             self.view.layoutIfNeeded()
             self.isRotating = false
@@ -727,7 +730,7 @@ final class KeyboardViewController: UIInputViewController {
         case .size:
             sizeIndex = (sizeIndex + 1) % sizePresets.count
             UserDefaults.standard.set(sizeIndex, forKey: "sizeIndex")
-            heightConstraint.constant = sizePresets[sizeIndex]
+            heightConstraint?.constant = sizePresets[sizeIndex]
         case .dismiss:
             dismissKeyboard()
         case .language:
