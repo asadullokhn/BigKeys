@@ -1,0 +1,41 @@
+# Contributing
+
+## Workflow
+
+1. **Never push to `master` directly.** It's protected — all changes go through a pull request.
+2. Branch from `master`: `feat/<short-name>` or `fix/<short-name>`.
+3. Open a PR into `master`. **Review by Ali (@asadullokhn) is required** — CODEOWNERS enforces this.
+4. Merge with **Squash and merge** once approved.
+
+## Before opening a PR
+
+- Build both targets (`BigKeys` app + `BigKeysKeyboard` extension) — the build must succeed.
+- Actually load the keyboard on a device or simulator and type with it. A keyboard that compiles but doesn't load is not done.
+- If you changed `project.yml`, run `xcodegen generate` and commit the regenerated project together with it.
+
+## Never commit
+
+- Signing changes (`DEVELOPMENT_TEAM`, provisioning). Set your own team locally in Xcode's Signing & Capabilities and leave it out of commits.
+- `DerivedData/`, `xcuserdata/` (already gitignored).
+
+## Commit style
+
+- Imperative mood, concise, explain the why: "Add word-level delete", not "added stuff".
+- No emojis. No `Co-Authored-By` lines.
+
+## Design rules that are not up for grabs
+
+These come from the team's community research — breaking them breaks the product's core promise. If you think one is wrong, raise it in a PR discussion, don't silently change it:
+
+1. **Grid positions are stable.** Never reorder or move existing cells — AAC users build muscle memory of where words live. Adding new words at the end of a category is fine.
+2. **Explore-then-commit stays.** Touch-down must never type. Sliding highlights; lifting commits.
+3. **The 0.5s double-tap guard stays** (deletes exempt).
+4. **No dead zones** — every point maps to the nearest key.
+5. **No Full Access** without a deliberate team decision. Prediction stays on-device.
+6. **Prediction lives in the suggestion bar only** — never inside the grid.
+7. **Language switching relabels in place** — positions never move between languages.
+8. Malay strings are unverified drafts until checked with the community. Mark any new translation as unverified in your PR description.
+
+## Memory budget
+
+Keyboard extensions get roughly 30-80MB before iOS kills them. No heavy assets, no large frameworks, no image libraries in the extension target without discussing it first.
