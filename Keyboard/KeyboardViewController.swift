@@ -298,11 +298,23 @@ final class KeyboardViewController: UIInputViewController {
             sizeIndex = min(max(UserDefaults.standard.integer(forKey: "sizeIndex"), 0), sizePresets.count - 1)
         }
 
-        trackingView.frame = view.bounds
-        trackingView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Height lives on OUR content view, never on the root view. The
+        // system derives the window height from content fitting; a height
+        // constraint on the root view fights the system's cached window
+        // frame, and the loser gets re-cached — that feedback loop is what
+        // made the keyboard grow on every open/close cycle.
+        trackingView.translatesAutoresizingMaskIntoConstraints = false
         trackingView.isMultipleTouchEnabled = false
         trackingView.controller = self
         view.addSubview(trackingView)
+        let height = trackingView.heightAnchor.constraint(equalToConstant: sizePresets[sizeIndex])
+        NSLayoutConstraint.activate([
+            trackingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            trackingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            trackingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            height,
+        ])
+        heightConstraint = height
 
         boardBackground.backgroundColor = .systemBackground
         trackingView.addSubview(boardBackground)
@@ -311,23 +323,9 @@ final class KeyboardViewController: UIInputViewController {
         buildKeys()
     }
 
-    // Canonical placement per Apple's Custom Keyboard guide: the height
-    // constraint goes in AFTER the view is in the hierarchy, never in
-    // viewDidLoad, at sub-required priority so the system's own window
-    // constraints are never contradicted.
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        if let constraint = heightConstraint {
-            constraint.constant = sizePresets[sizeIndex]
-        } else {
-            let constraint = NSLayoutConstraint(
-                item: view!, attribute: .height, relatedBy: .equal,
-                toItem: nil, attribute: .notAnAttribute, multiplier: 1,
-                constant: sizePresets[sizeIndex])
-            constraint.priority = .init(999)
-            view.addConstraint(constraint)
-            heightConstraint = constraint
-        }
+        heightConstraint?.constant = sizePresets[sizeIndex]
     }
 
     override func viewDidLayoutSubviews() {
@@ -343,7 +341,7 @@ final class KeyboardViewController: UIInputViewController {
         // Self-heal: if the container is still oversized once rotation has
         // settled, rebuild the height constraint from scratch — reasserting
         // the existing one is not always enough to shrink the window.
-        let drift = view.bounds.height - sizePresets[sizeIndex]
+        let drift = trackingView.bounds.height - sizePresets[sizeIndex]
         if !isRotating, !pendingHeightFix, drift > 1, healAttempts < 2, heightConstraint != nil {
             pendingHeightFix = true
             healAttempts += 1
