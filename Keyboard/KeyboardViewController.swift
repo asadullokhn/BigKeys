@@ -314,6 +314,21 @@ final class KeyboardViewController: UIInputViewController {
         layoutKeys()
     }
 
+    // On rotation the system can hand the extension transient, oversized
+    // bounds. Reassert our height across the transition so the keyboard
+    // settles back to its preset instead of staying huge.
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
+            self.view.setNeedsLayout()
+        }, completion: { _ in
+            self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
+        })
+    }
+
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         updateSuggestions()
@@ -510,7 +525,11 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Layout
 
     private func layoutKeys() {
-        let bounds = trackingView.bounds
+        // Never lay out against more height than the active preset — if the
+        // container is transiently oversized (mid-rotation), keys would
+        // otherwise scale up with it and stick that way.
+        var bounds = trackingView.bounds
+        bounds.size.height = min(bounds.height, sizePresets[sizeIndex])
         guard bounds.width > 0, !keys.isEmpty else { return }
         let inset: CGFloat = 4
 
