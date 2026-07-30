@@ -246,7 +246,8 @@ final class KeyboardViewController: UIInputViewController {
     // the grid drops to compact mode instead of breaking.
     private let sizePresets: [CGFloat] = [280, 360, 440]
     private var sizeIndex = 2
-    private var heightConstraint: NSLayoutConstraint!
+    private var heightConstraint: NSLayoutConstraint?
+    private var healAttempts = 0
     private var lastCompact = false
     private let topBarHeight: CGFloat = 56
     private let debounceInterval: TimeInterval = 0.5
@@ -254,6 +255,16 @@ final class KeyboardViewController: UIInputViewController {
     private var isCompact: Bool {
         view.bounds.width > 0 && view.bounds.width < 500
     }
+
+    /// Top of the drawn keyboard band inside the container. Non-zero only
+    /// when the system hands us an oversized container.
+    fileprivate var layoutYOffset: CGFloat = 0
+
+    /// Paints only the actual keyboard band — the rest of an oversized
+    /// container stays transparent instead of a white wall.
+    private let boardBackground = UIView()
+    private var isRotating = false
+    private var pendingHeightFix = false
 
     private var keys: [Key] = []
     private var layer: Layer = .grid
@@ -276,7 +287,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .clear
 
         usageCounts = (UserDefaults.standard.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
         learnedBigrams = (UserDefaults.standard.dictionary(forKey: "bigrams") as? [String: Int]) ?? [:]
@@ -287,20 +298,34 @@ final class KeyboardViewController: UIInputViewController {
             sizeIndex = min(max(UserDefaults.standard.integer(forKey: "sizeIndex"), 0), sizePresets.count - 1)
         }
 
-        heightConstraint = NSLayoutConstraint(
-            item: view!, attribute: .height, relatedBy: .equal,
-            toItem: nil, attribute: .notAnAttribute, multiplier: 1, constant: sizePresets[sizeIndex])
-        heightConstraint.priority = .init(999)
-        view.addConstraint(heightConstraint)
-
-        trackingView.frame = view.bounds
-        trackingView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Height lives on OUR content view, never on the root view. The
+        // system derives the window height from content fitting; a height
+        // constraint on the root view fights the system's cached window
+        // frame, and the loser gets re-cached — that feedback loop is what
+        // made the keyboard grow on every open/close cycle.
+        trackingView.translatesAutoresizingMaskIntoConstraints = false
         trackingView.isMultipleTouchEnabled = false
         trackingView.controller = self
         view.addSubview(trackingView)
+        let height = trackingView.heightAnchor.constraint(equalToConstant: sizePresets[sizeIndex])
+        NSLayoutConstraint.activate([
+            trackingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            trackingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            trackingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            height,
+        ])
+        heightConstraint = height
+
+        boardBackground.backgroundColor = .systemBackground
+        trackingView.addSubview(boardBackground)
 
         buildSuggestionBar()
         buildKeys()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        heightConstraint?.constant = sizePresets[sizeIndex]
     }
 
     override func viewDidLayoutSubviews() {
@@ -312,6 +337,46 @@ final class KeyboardViewController: UIInputViewController {
             buildKeys()
         }
         layoutKeys()
+
+        // Self-heal: if the container is still oversized once rotation has
+        // settled, rebuild the height constraint from scratch — reasserting
+        // the existing one is not always enough to shrink the window.
+        let drift = trackingView.bounds.height - sizePresets[sizeIndex]
+        if !isRotating, !pendingHeightFix, drift > 1, healAttempts < 2, heightConstraint != nil {
+            pendingHeightFix = true
+            healAttempts += 1
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let constraint = self.heightConstraint else { return }
+                // A genuine value change — same-value updates are no-ops to
+                // the layout engine and never shrink the stale window.
+                constraint.constant = self.sizePresets[self.sizeIndex] - 2
+                self.view.setNeedsLayout()
+                self.view.layoutIfNeeded()
+                constraint.constant = self.sizePresets[self.sizeIndex]
+                self.view.setNeedsLayout()
+                self.view.layoutIfNeeded()
+                self.pendingHeightFix = false
+            }
+        }
+    }
+
+    // On rotation the system can hand the extension transient, oversized
+    // bounds. Reassert our height across the transition so the keyboard
+    // settles back to its preset instead of staying huge.
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        isRotating = true
+        healAttempts = 0
+        coordinator.animate(alongsideTransition: { _ in
+            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
+            self.view.setNeedsLayout()
+        }, completion: { _ in
+            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
+            self.isRotating = false
+            self.view.setNeedsLayout()
+        })
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -360,9 +425,12 @@ final class KeyboardViewController: UIInputViewController {
                     : "Words you use often will appear here — tap to go to Core"
                 wordRows.append([(.category(1), hint)])
             }
+            // No space or character-delete here: words insert their own
+            // spacing, and character-level fixing belongs to the letter
+            // layer — fewer keys means bigger targets.
             wordRows.append([
-                (.toLetters, "abc"), (.space, lang == .ms ? "jarak" : "space"),
-                (.deleteWord, lang == .ms ? "⌫ kata" : "⌫ word"), (.delete, "⌫"),
+                (.toLetters, "abc"),
+                (.deleteWord, lang == .ms ? "⌫ kata" : "⌫ word"),
                 (.ret, "return"), (.language, lang == .en ? "EN" : "MS"),
                 (.size, "⤢"), (.dismiss, "⌄"),
             ])
@@ -510,20 +578,33 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Layout
 
     private func layoutKeys() {
-        let bounds = trackingView.bounds
+        // Never lay out against more height than the active preset — if the
+        // container is transiently oversized (mid-rotation), keys would
+        // otherwise scale up with it and stick that way.
+        let fullBounds = trackingView.bounds
+        var bounds = fullBounds
+        bounds.size.height = min(bounds.height, sizePresets[sizeIndex])
         guard bounds.width > 0, !keys.isEmpty else { return }
+        // Anchor the keyboard band to the BOTTOM of the container: when the
+        // system hands us an oversized container after rotation, the gap
+        // opens above the keys (where the app content is) instead of
+        // leaving a dead band under them.
+        let yOffset = fullBounds.height - bounds.height
+        layoutYOffset = yOffset
+        boardBackground.frame = CGRect(
+            x: 0, y: yOffset, width: fullBounds.width, height: fullBounds.height - yOffset)
         let inset: CGFloat = 4
 
         let barWidth = bounds.width - inset * 2
         let slotWidth = barWidth / 3
         for (i, button) in suggestionButtons.enumerated() {
             button.frame = CGRect(
-                x: inset + CGFloat(i) * slotWidth + 3, y: inset,
+                x: inset + CGFloat(i) * slotWidth + 3, y: yOffset + inset,
                 width: slotWidth - 6, height: topBarHeight - inset * 2)
         }
 
         var keyIndex = 0
-        var gridTop = topBarHeight
+        var gridTop = yOffset + topBarHeight
 
         if layer == .grid {
             let tabs = topBarKeys()
@@ -531,15 +612,15 @@ final class KeyboardViewController: UIInputViewController {
             let tabWidth = bounds.width / CGFloat(tabs.count)
             for i in 0..<tabs.count {
                 keys[keyIndex].view.frame = CGRect(
-                    x: CGFloat(i) * tabWidth + 2, y: topBarHeight + 2,
+                    x: CGFloat(i) * tabWidth + 2, y: yOffset + topBarHeight + 2,
                     width: tabWidth - 4, height: tabHeight - 4)
                 keyIndex += 1
             }
-            gridTop = topBarHeight + tabHeight
+            gridTop = yOffset + topBarHeight + tabHeight
         }
 
         let rowDefs = rows(for: layer)
-        let rowHeight = (bounds.height - gridTop) / CGFloat(rowDefs.count)
+        let rowHeight = (fullBounds.height - gridTop) / CGFloat(rowDefs.count)
 
         for (rowIdx, row) in rowDefs.enumerated() {
             let y = gridTop + CGFloat(rowIdx) * rowHeight
@@ -550,7 +631,7 @@ final class KeyboardViewController: UIInputViewController {
 
             for (colIdx, item) in row.enumerated() {
                 var width = available / CGFloat(row.count)
-                if isBottomRow && row.count > 1 {
+                if isBottomRow && row.count > 1 && row.contains(where: { $0.0 == .space }) {
                     let spaceShare: CGFloat = isCompact ? 0.25 : 0.4
                     let otherShare = (1 - spaceShare) / CGFloat(row.count - 1)
                     width = available * (item.0 == .space ? spaceShare : otherShare)
@@ -593,7 +674,7 @@ final class KeyboardViewController: UIInputViewController {
     /// No dead zones: any point below the suggestion bar maps to the
     /// nearest key by center distance.
     private func keyIndex(at point: CGPoint) -> Int? {
-        guard point.y > topBarHeight else { return nil } // suggestion buttons handle themselves
+        guard point.y > layoutYOffset + topBarHeight else { return nil } // suggestion buttons handle themselves
         if let globe = globeButton, globe.frame.contains(point) { return nil }
         var best: (index: Int, distance: CGFloat)?
         for (i, key) in keys.enumerated() {
@@ -647,7 +728,7 @@ final class KeyboardViewController: UIInputViewController {
         case .size:
             sizeIndex = (sizeIndex + 1) % sizePresets.count
             UserDefaults.standard.set(sizeIndex, forKey: "sizeIndex")
-            heightConstraint.constant = sizePresets[sizeIndex]
+            heightConstraint?.constant = sizePresets[sizeIndex]
         case .dismiss:
             dismissKeyboard()
         case .language:
@@ -787,6 +868,13 @@ final class KeyboardViewController: UIInputViewController {
 /// rather than touch-down.
 private final class TrackingView: UIView {
     weak var controller: KeyboardViewController?
+
+    // Let touches above the keyboard band fall through to the app instead
+    // of being swallowed by a transparent, oversized container.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if let controller, point.y < controller.layoutYOffset { return nil }
+        return super.hitTest(point, with: event)
+    }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }

@@ -64,6 +64,11 @@ Requirements: Xcode 26+, an iPad (or simulator), and a signing team.
 
 First run on a new device needs Developer Mode enabled (Settings → Privacy & Security → Developer Mode) and the device registered to your team — Xcode handles that automatically on first install.
 
+## Testing
+
+- Manual: build to a device, enable the keyboard, and use the practice field in the app. The regression checklist that matters: open/close/reopen the keyboard several times, rotate both ways, and confirm the height never grows (this was a real bug — see the git history on `fix/rotation-height`).
+- Automated: `UITests/KeyboardHeightTests.swift` contains a scripted version of that exact checklist with height assertions. It is currently prefixed `todo_` (skipped) because reliably making a third-party keyboard the *active* keyboard inside a simulator is unsolved — the file documents what was tried. Run it by renaming the method to `test...` and running the BigKeys scheme's tests against a **freshly erased** simulator.
+
 ## Known limitations / not yet decided
 
 - Malay vocabulary was drafted by the team, not by a native-speaking AAC user — verify every word with Fadillah before testing with Sayfullah. Singaporean Malay has colloquial forms a dictionary translation misses.

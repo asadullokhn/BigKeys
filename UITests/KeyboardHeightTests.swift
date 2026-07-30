@@ -1,0 +1,151 @@
+import XCTest
+
+// Regression test for the height-growth bug: the keyboard grew on every
+// open/close cycle because a root-view height constraint fed back into
+// the system's cached window height. This reproduces the user-reported
+// cycle (open, close, reopen, rotate) and asserts the keyboard's
+// app-visible size stays put.
+//
+// PRECONDITION: BigKeys must already be enabled on the simulator
+// (Settings → General → Keyboard → Keyboards → Add New Keyboard).
+// Automating that enablement proved unreliable — the AppleKeyboards
+// defaults write is ignored by the live input system, and Settings-app
+// navigation differs on iPadOS 26 (attempts preserved in
+// enableBigKeysViaSettings, currently unused).
+//
+// Measurement note: a custom keyboard does NOT surface as a `Keyboard`
+// AX element, so app.keyboards is useless here. Instead we detect
+// BigKeys by its own "Core" tab, and measure the keyboard's effective
+// size by where the focused text field sits — a ballooning keyboard
+// window pushes the field toward the top of the screen, which is
+// exactly the user-visible symptom.
+final class KeyboardHeightTests: XCTestCase {
+
+    private let tolerance: CGFloat = 60
+
+    func testKeyboardSizeStableAcrossCyclesAndRotation() {
+        let app = XCUIApplication()
+        app.launch()
+        XCUIDevice.shared.orientation = .portrait
+
+        let field = practiceField(in: app)
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "practice field not found")
+        field.tap()
+
+        // A newly enabled third-party keyboard triggers a one-time system
+        // education sheet ("Quickly Change Keyboards") that blocks input.
+        let continueButton = app.buttons["Continue"]
+        if continueButton.waitForExistence(timeout: 3) {
+            continueButton.tap()
+            field.tap()
+        }
+
+        ensureBigKeysActive(app)
+        let screenHeight = XCUIScreen.main.screenshot().image.size.height
+
+        let baseline = practiceField(in: app).frame.maxY
+        snapshot(name: "open-1-baseline")
+        XCTAssertGreaterThan(baseline, screenHeight * 0.2,
+                             "field crushed to the top on first open — keyboard window oversized")
+
+        // The reported reproduction: open, close, open again, repeatedly.
+        for cycle in 1...3 {
+            XCUIDevice.shared.press(.home)
+            Thread.sleep(forTimeInterval: 1)
+            app.activate()
+            if !app.staticTexts["Core"].waitForExistence(timeout: 3) {
+                practiceField(in: app).tap()
+            }
+            ensureBigKeysActive(app)
+            let position = practiceField(in: app).frame.maxY
+            snapshot(name: "cycle-\(cycle)")
+            XCTAssertEqual(position, baseline, accuracy: tolerance,
+                           "keyboard size drifted on cycle \(cycle): field at \(baseline) → \(position)")
+        }
+
+        // Rotation both ways; after returning to portrait the field must
+        // sit where it started.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 1.5)
+        snapshot(name: "landscape")
+        XCTAssertTrue(app.staticTexts["Core"].exists, "BigKeys lost after rotation")
+
+        XCUIDevice.shared.orientation = .portrait
+        Thread.sleep(forTimeInterval: 1.5)
+        let back = practiceField(in: app).frame.maxY
+        snapshot(name: "back-to-portrait")
+        XCTAssertEqual(back, baseline, accuracy: tolerance,
+                       "keyboard size did not recover after rotation: field at \(baseline) → \(back)")
+
+        // One more open/close after rotating — the compound case.
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval: 1)
+        app.activate()
+        if !app.staticTexts["Core"].waitForExistence(timeout: 3) {
+            practiceField(in: app).tap()
+        }
+        ensureBigKeysActive(app)
+        let final = practiceField(in: app).frame.maxY
+        snapshot(name: "final")
+        XCTAssertEqual(final, baseline, accuracy: tolerance,
+                       "keyboard size drifted after rotation + reopen: field at \(baseline) → \(final)")
+    }
+
+    // SwiftUI's multiline TextField can surface as either element type.
+    private func practiceField(in app: XCUIApplication) -> XCUIElement {
+        app.textFields.firstMatch.exists ? app.textFields.firstMatch : app.textViews.firstMatch
+    }
+
+    /// Cycle the globe key until our grid shows up, and hard-fail if it
+    /// never does. Without this the test can pass while silently measuring
+    /// the system keyboard.
+    private func ensureBigKeysActive(_ app: XCUIApplication) {
+        for _ in 0..<6 {
+            if app.staticTexts["Core"].waitForExistence(timeout: 2) { return }
+            let globe = app.buttons["Next keyboard"].exists
+                ? app.buttons["Next keyboard"]
+                : app.buttons.matching(
+                    NSPredicate(format: "label CONTAINS[c] 'keyboard'")).firstMatch
+            guard globe.exists else { break }
+            globe.tap()
+        }
+        XCTAssertTrue(app.staticTexts["Core"].exists,
+                      "BigKeys is not the active keyboard — the test would be measuring the system keyboard")
+    }
+
+    /// Unused: preserved documentation of the enablement-automation
+    /// attempts. See the header comment for why this is manual for now.
+    private func enableBigKeysViaSettings() {
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        settings.launch()
+        let general = settings.staticTexts["General"].firstMatch
+        guard general.waitForExistence(timeout: 10) else { return }
+        general.tap()
+        let keyboardRow = settings.staticTexts["Keyboard"].firstMatch
+        guard keyboardRow.waitForExistence(timeout: 5) else { return }
+        keyboardRow.tap()
+        let keyboardsRow = settings.staticTexts["Keyboards"].firstMatch
+        guard keyboardsRow.waitForExistence(timeout: 5) else { return }
+        keyboardsRow.tap()
+        if settings.staticTexts["BigKeys"].waitForExistence(timeout: 2) {
+            settings.terminate()
+            return
+        }
+        let addNew = settings.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Add New Keyboard'")).firstMatch
+        guard addNew.waitForExistence(timeout: 5) else { return }
+        addNew.tap()
+        let bigKeys = settings.staticTexts["BigKeys"].firstMatch
+        if bigKeys.waitForExistence(timeout: 5) {
+            bigKeys.tap()
+        }
+        settings.terminate()
+    }
+
+    private func snapshot(name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}
