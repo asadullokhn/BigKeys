@@ -12,9 +12,23 @@ import UIKit
 //    ignored (Game Accessibility Guidelines debounce recommendation).
 // 3. No dead zones: every point of the surface belongs to a key, so
 //    precision is never required — the nearest key wins.
-// 4. Stable targets: prediction lives in the suggestion bar; grid cells
-//    never reorder, because motor planning depends on stable positions.
+// 4. Stable targets: prediction lives in the suggestion bar, and language
+//    switching relabels cells in place — grid positions never move,
+//    because motor planning depends on stable positions.
 // Word-class colors follow the Fitzgerald key convention AAC systems use.
+
+// MARK: - Language
+
+enum Lang: String {
+    case en, ms // English, Malay (Bahasa Melayu) — Singapore's context
+
+    var spellCheckCode: String {
+        switch self {
+        case .en: return "en_US"
+        case .ms: return "ms_MY"
+        }
+    }
+}
 
 // MARK: - Vocabulary
 
@@ -34,126 +48,166 @@ private enum WordClass {
     }
 }
 
+// A cell is one concept with one grid position; language only changes its
+// label. Malay translations are drafts — verify with Fadillah before
+// putting this in front of Sayfullah.
 private struct VocabWord {
-    let text: String
+    let en: String
+    let ms: String
     let emoji: String?
     let wordClass: WordClass
 
-    init(_ text: String, _ emoji: String? = nil, _ wordClass: WordClass) {
-        self.text = text
+    init(_ en: String, ms: String? = nil, emoji: String? = nil, _ wordClass: WordClass) {
+        self.en = en
+        self.ms = ms ?? en
         self.emoji = emoji
         self.wordClass = wordClass
     }
+
+    func text(_ lang: Lang) -> String {
+        lang == .ms ? ms : en
+    }
 }
 
-private let vocabulary: [(name: String, words: [VocabWord])] = [
-    ("Core", [
-        VocabWord("I", nil, .pronoun), VocabWord("you", nil, .pronoun),
-        VocabWord("want", nil, .verb), VocabWord("like", nil, .verb),
-        VocabWord("go", nil, .verb), VocabWord("help", "🤝", .verb),
-        VocabWord("more", nil, .descriptor), VocabWord("stop", "✋", .verb),
-        VocabWord("yes", "✅", .social), VocabWord("no", "❌", .social),
-        VocabWord("not", nil, .descriptor), VocabWord("this", nil, .pronoun),
-        VocabWord("that", nil, .pronoun), VocabWord("good", "👍", .descriptor),
-        VocabWord("bad", "👎", .descriptor), VocabWord("now", nil, .descriptor),
-        VocabWord("later", nil, .descriptor), VocabWord("what", nil, .question),
-        VocabWord("where", nil, .question), VocabWord("when", nil, .question),
-        VocabWord("who", nil, .question), VocabWord("can", nil, .verb),
-        VocabWord(".", nil, .punct), VocabWord("?", nil, .punct),
+private struct Category {
+    let en: String
+    let ms: String
+    let words: [VocabWord]
+
+    func name(_ lang: Lang) -> String {
+        lang == .ms ? ms : en
+    }
+}
+
+private let vocabulary: [Category] = [
+    Category(en: "Core", ms: "Teras", words: [
+        VocabWord("I", ms: "saya", .pronoun), VocabWord("you", ms: "awak", .pronoun),
+        VocabWord("want", ms: "mahu", .verb), VocabWord("like", ms: "suka", .verb),
+        VocabWord("go", ms: "pergi", .verb), VocabWord("help", ms: "tolong", emoji: "🤝", .verb),
+        VocabWord("more", ms: "lagi", .descriptor), VocabWord("stop", ms: "berhenti", emoji: "✋", .verb),
+        VocabWord("yes", ms: "ya", emoji: "✅", .social), VocabWord("no", ms: "tidak", emoji: "❌", .social),
+        VocabWord("not", ms: "bukan", .descriptor), VocabWord("this", ms: "ini", .pronoun),
+        VocabWord("that", ms: "itu", .pronoun), VocabWord("good", ms: "bagus", emoji: "👍", .descriptor),
+        VocabWord("bad", ms: "teruk", emoji: "👎", .descriptor), VocabWord("now", ms: "sekarang", .descriptor),
+        VocabWord("later", ms: "nanti", .descriptor), VocabWord("what", ms: "apa", .question),
+        VocabWord("where", ms: "di mana", .question), VocabWord("when", ms: "bila", .question),
+        VocabWord("who", ms: "siapa", .question), VocabWord("can", ms: "boleh", .verb),
+        VocabWord(".", .punct), VocabWord("?", .punct),
     ]),
-    ("People", [
-        VocabWord("I", nil, .pronoun), VocabWord("you", nil, .pronoun),
-        VocabWord("Mum", "👩", .noun), VocabWord("Dad", "👨", .noun),
-        VocabWord("brother", "👦", .noun), VocabWord("sister", "👧", .noun),
-        VocabWord("friend", "🧑‍🤝‍🧑", .noun), VocabWord("teacher", "🧑‍🏫", .noun),
-        VocabWord("doctor", "🧑‍⚕️", .noun), VocabWord("everyone", "👥", .noun),
-        VocabWord("we", nil, .pronoun), VocabWord("they", nil, .pronoun),
+    Category(en: "People", ms: "Orang", words: [
+        VocabWord("I", ms: "saya", .pronoun), VocabWord("you", ms: "awak", .pronoun),
+        VocabWord("Mum", ms: "Ibu", emoji: "👩", .noun), VocabWord("Dad", ms: "Ayah", emoji: "👨", .noun),
+        VocabWord("brother", ms: "abang", emoji: "👦", .noun), VocabWord("sister", ms: "kakak", emoji: "👧", .noun),
+        VocabWord("friend", ms: "kawan", emoji: "🧑‍🤝‍🧑", .noun), VocabWord("teacher", ms: "cikgu", emoji: "🧑‍🏫", .noun),
+        VocabWord("doctor", ms: "doktor", emoji: "🧑‍⚕️", .noun), VocabWord("everyone", ms: "semua", emoji: "👥", .noun),
+        VocabWord("we", ms: "kami", .pronoun), VocabWord("they", ms: "mereka", .pronoun),
     ]),
-    ("Actions", [
-        VocabWord("eat", "🍽️", .verb), VocabWord("drink", "🥤", .verb),
-        VocabWord("play", "🎮", .verb), VocabWord("watch", "📺", .verb),
-        VocabWord("draw", "🎨", .verb), VocabWord("read", "📖", .verb),
-        VocabWord("write", "✍️", .verb), VocabWord("make", "🛠️", .verb),
-        VocabWord("open", nil, .verb), VocabWord("close", nil, .verb),
-        VocabWord("give", nil, .verb), VocabWord("get", nil, .verb),
-        VocabWord("come", nil, .verb), VocabWord("look", "👀", .verb),
-        VocabWord("listen", "👂", .verb), VocabWord("wait", "⏳", .verb),
+    Category(en: "Actions", ms: "Tindakan", words: [
+        VocabWord("eat", ms: "makan", emoji: "🍽️", .verb), VocabWord("drink", ms: "minum", emoji: "🥤", .verb),
+        VocabWord("play", ms: "main", emoji: "🎮", .verb), VocabWord("watch", ms: "tonton", emoji: "📺", .verb),
+        VocabWord("draw", ms: "lukis", emoji: "🎨", .verb), VocabWord("read", ms: "baca", emoji: "📖", .verb),
+        VocabWord("write", ms: "tulis", emoji: "✍️", .verb), VocabWord("make", ms: "buat", emoji: "🛠️", .verb),
+        VocabWord("open", ms: "buka", .verb), VocabWord("close", ms: "tutup", .verb),
+        VocabWord("give", ms: "beri", .verb), VocabWord("get", ms: "dapat", .verb),
+        VocabWord("come", ms: "datang", .verb), VocabWord("look", ms: "tengok", emoji: "👀", .verb),
+        VocabWord("listen", ms: "dengar", emoji: "👂", .verb), VocabWord("wait", ms: "tunggu", emoji: "⏳", .verb),
     ]),
-    ("Feelings", [
-        VocabWord("happy", "😊", .descriptor), VocabWord("sad", "😢", .descriptor),
-        VocabWord("angry", "😠", .descriptor), VocabWord("tired", "😴", .descriptor),
-        VocabWord("excited", "🤩", .descriptor), VocabWord("scared", "😨", .descriptor),
-        VocabWord("bored", "🥱", .descriptor), VocabWord("sick", "🤒", .descriptor),
-        VocabWord("hungry", "😋", .descriptor), VocabWord("thirsty", "🥵", .descriptor),
-        VocabWord("okay", "🙆", .descriptor), VocabWord("great", "🌟", .descriptor),
+    Category(en: "Feelings", ms: "Perasaan", words: [
+        VocabWord("happy", ms: "gembira", emoji: "😊", .descriptor), VocabWord("sad", ms: "sedih", emoji: "😢", .descriptor),
+        VocabWord("angry", ms: "marah", emoji: "😠", .descriptor), VocabWord("tired", ms: "penat", emoji: "😴", .descriptor),
+        VocabWord("excited", ms: "teruja", emoji: "🤩", .descriptor), VocabWord("scared", ms: "takut", emoji: "😨", .descriptor),
+        VocabWord("bored", ms: "bosan", emoji: "🥱", .descriptor), VocabWord("sick", ms: "sakit", emoji: "🤒", .descriptor),
+        VocabWord("hungry", ms: "lapar", emoji: "😋", .descriptor), VocabWord("thirsty", ms: "haus", emoji: "🥵", .descriptor),
+        VocabWord("okay", ms: "okay", emoji: "🙆", .descriptor), VocabWord("great", ms: "hebat", emoji: "🌟", .descriptor),
     ]),
-    ("Food", [
-        VocabWord("water", "💧", .noun), VocabWord("rice", "🍚", .noun),
-        VocabWord("chicken", "🍗", .noun), VocabWord("noodles", "🍜", .noun),
-        VocabWord("bread", "🍞", .noun), VocabWord("fruit", "🍎", .noun),
-        VocabWord("banana", "🍌", .noun), VocabWord("juice", "🧃", .noun),
-        VocabWord("milk", "🥛", .noun), VocabWord("tea", "🍵", .noun),
-        VocabWord("biryani", "🍛", .noun), VocabWord("chocolate", "🍫", .noun),
+    Category(en: "Food", ms: "Makanan", words: [
+        VocabWord("water", ms: "air", emoji: "💧", .noun), VocabWord("rice", ms: "nasi", emoji: "🍚", .noun),
+        VocabWord("chicken", ms: "ayam", emoji: "🍗", .noun), VocabWord("noodles", ms: "mi", emoji: "🍜", .noun),
+        VocabWord("bread", ms: "roti", emoji: "🍞", .noun), VocabWord("fruit", ms: "buah", emoji: "🍎", .noun),
+        VocabWord("banana", ms: "pisang", emoji: "🍌", .noun), VocabWord("juice", ms: "jus", emoji: "🧃", .noun),
+        VocabWord("milk", ms: "susu", emoji: "🥛", .noun), VocabWord("tea", ms: "teh", emoji: "🍵", .noun),
+        VocabWord("biryani", ms: "briyani", emoji: "🍛", .noun), VocabWord("chocolate", ms: "coklat", emoji: "🍫", .noun),
     ]),
-    ("Places", [
-        VocabWord("home", "🏠", .noun), VocabWord("school", "🏫", .noun),
-        VocabWord("outside", "🌳", .noun), VocabWord("shop", "🛒", .noun),
-        VocabWord("park", "🏞️", .noun), VocabWord("bus", "🚌", .noun),
-        VocabWord("MRT", "🚇", .noun), VocabWord("restaurant", "🍔", .noun),
-        VocabWord("hospital", "🏥", .noun), VocabWord("toilet", "🚻", .noun),
-        VocabWord("here", nil, .descriptor), VocabWord("there", nil, .descriptor),
+    Category(en: "Places", ms: "Tempat", words: [
+        VocabWord("home", ms: "rumah", emoji: "🏠", .noun), VocabWord("school", ms: "sekolah", emoji: "🏫", .noun),
+        VocabWord("outside", ms: "luar", emoji: "🌳", .noun), VocabWord("shop", ms: "kedai", emoji: "🛒", .noun),
+        VocabWord("park", ms: "taman", emoji: "🏞️", .noun), VocabWord("bus", ms: "bas", emoji: "🚌", .noun),
+        VocabWord("MRT", emoji: "🚇", .noun), VocabWord("restaurant", ms: "restoran", emoji: "🍔", .noun),
+        VocabWord("hospital", emoji: "🏥", .noun), VocabWord("toilet", ms: "tandas", emoji: "🚻", .noun),
+        VocabWord("here", ms: "sini", .descriptor), VocabWord("there", ms: "sana", .descriptor),
     ]),
-    ("Art", [
-        VocabWord("draw", "🎨", .verb), VocabWord("paint", "🖌️", .verb),
-        VocabWord("color", "🌈", .noun), VocabWord("picture", "🖼️", .noun),
-        VocabWord("comic", "📚", .noun), VocabWord("monster", "👾", .noun),
-        VocabWord("idea", "💡", .noun), VocabWord("cool", "😎", .descriptor),
-        VocabWord("funny", "😂", .descriptor), VocabWord("new", "✨", .descriptor),
-        VocabWord("finished", "🏁", .descriptor), VocabWord("show you", "👀", .social),
+    Category(en: "Art", ms: "Seni", words: [
+        VocabWord("draw", ms: "lukis", emoji: "🎨", .verb), VocabWord("paint", ms: "cat", emoji: "🖌️", .verb),
+        VocabWord("color", ms: "warna", emoji: "🌈", .noun), VocabWord("picture", ms: "gambar", emoji: "🖼️", .noun),
+        VocabWord("comic", ms: "komik", emoji: "📚", .noun), VocabWord("monster", ms: "raksasa", emoji: "👾", .noun),
+        VocabWord("idea", emoji: "💡", .noun), VocabWord("cool", ms: "menarik", emoji: "😎", .descriptor),
+        VocabWord("funny", ms: "kelakar", emoji: "😂", .descriptor), VocabWord("new", ms: "baru", emoji: "✨", .descriptor),
+        VocabWord("finished", ms: "siap", emoji: "🏁", .descriptor), VocabWord("show you", ms: "tunjuk", emoji: "👀", .social),
     ]),
-    ("Chat", [
-        VocabWord("hello", "👋", .social), VocabWord("bye", "👋", .social),
-        VocabWord("please", "🙏", .social), VocabWord("thank you", "🙏", .social),
-        VocabWord("sorry", nil, .social), VocabWord("how are you", nil, .social),
-        VocabWord("I'm good", nil, .social), VocabWord("wait a moment", "⏳", .social),
-        VocabWord("nice to meet you", nil, .social), VocabWord("see you later", nil, .social),
-        VocabWord("I use this to talk", "💬", .social), VocabWord("haha", "😂", .social),
+    Category(en: "Chat", ms: "Sembang", words: [
+        VocabWord("hello", ms: "hai", emoji: "👋", .social), VocabWord("bye", emoji: "👋", .social),
+        VocabWord("please", ms: "tolong", emoji: "🙏", .social), VocabWord("thank you", ms: "terima kasih", emoji: "🙏", .social),
+        VocabWord("sorry", ms: "maaf", .social), VocabWord("how are you", ms: "apa khabar", .social),
+        VocabWord("I'm good", ms: "khabar baik", .social), VocabWord("wait a moment", ms: "tunggu sekejap", emoji: "⏳", .social),
+        VocabWord("nice to meet you", ms: "selamat berkenalan", .social), VocabWord("see you later", ms: "jumpa lagi", .social),
+        VocabWord("I use this to talk", ms: "Saya guna ini untuk bercakap", emoji: "💬", .social),
+        VocabWord("haha", emoji: "😂", .social),
     ]),
 ]
 
-/// Global lookup so Recents cells keep their color and emoji.
+/// Lookup by either language's text, so Recents keeps color and emoji
+/// regardless of which language a word was used in.
 private let vocabIndex: [String: VocabWord] = {
     var index: [String: VocabWord] = [:]
     for category in vocabulary {
-        for word in category.words where index[word.text] == nil {
-            index[word.text] = word
+        for word in category.words {
+            if index[word.en] == nil { index[word.en] = word }
+            if index[word.ms] == nil { index[word.ms] = word }
         }
     }
     return index
 }()
 
-/// Seed bigrams so prediction is useful before any learning has happened.
-private let seedBigrams: [String: [String]] = [
-    "": ["I", "you", "hello"],
-    "i": ["want", "like", "need"],
-    "you": ["can", "want", "okay"],
-    "want": ["more", "that", "food"],
-    "like": ["this", "that", "it"],
-    "can": ["you", "we", "help"],
-    "go": ["home", "outside", "now"],
-    "help": ["me", "please"],
-    "more": ["please", "time"],
-    "what": ["time", "happened"],
-    "where": ["are", "is"],
-    "not": ["good", "now", "yet"],
-    "this": ["is", "one"],
-    "that": ["is", "one"],
-    "eat": ["rice", "chicken", "now"],
-    "drink": ["water", "juice", "tea"],
-    "draw": ["monster", "picture", "now"],
-    "my": ["Mum", "friend", "idea"],
-    "thank": ["you"],
-    "how": ["are you"],
+/// Seed bigrams per language so prediction is useful before any learning.
+private let seedBigrams: [Lang: [String: [String]]] = [
+    .en: [
+        "": ["I", "you", "hello"],
+        "i": ["want", "like", "need"],
+        "you": ["can", "want", "okay"],
+        "want": ["more", "that", "food"],
+        "like": ["this", "that", "it"],
+        "can": ["you", "we", "help"],
+        "go": ["home", "outside", "now"],
+        "help": ["me", "please"],
+        "more": ["please", "time"],
+        "what": ["time", "happened"],
+        "where": ["are", "is"],
+        "not": ["good", "now", "yet"],
+        "this": ["is", "one"],
+        "that": ["is", "one"],
+        "eat": ["rice", "chicken", "now"],
+        "drink": ["water", "juice", "tea"],
+        "draw": ["monster", "picture", "now"],
+        "my": ["Mum", "friend", "idea"],
+        "thank": ["you"],
+        "how": ["are you"],
+    ],
+    .ms: [
+        "": ["Saya", "awak", "hai"],
+        "saya": ["mahu", "suka", "boleh"],
+        "awak": ["boleh", "mahu", "okay"],
+        "mahu": ["makan", "lagi", "itu"],
+        "suka": ["ini", "itu"],
+        "boleh": ["tolong", "pergi"],
+        "pergi": ["rumah", "sekolah", "sekarang"],
+        "tolong": ["saya"],
+        "makan": ["nasi", "ayam", "sekarang"],
+        "minum": ["air", "jus", "teh"],
+        "lukis": ["raksasa", "gambar"],
+        "terima": ["kasih"],
+        "apa": ["khabar"],
+        "tidak": ["mahu", "boleh"],
+    ],
 ]
 
 // MARK: - Controller
@@ -175,6 +229,7 @@ final class KeyboardViewController: UIInputViewController {
         case ret
         case size
         case dismiss
+        case language
     }
 
     private struct Key {
@@ -204,6 +259,7 @@ final class KeyboardViewController: UIInputViewController {
     private var layer: Layer = .grid
     private var categoryIndex = 1 // Recents is 0; start on Core
     private var shifted = false
+    private var lang: Lang = .en
     private var lastCommit: (action: KeyAction, at: Date)?
 
     private let trackingView = TrackingView()
@@ -224,6 +280,9 @@ final class KeyboardViewController: UIInputViewController {
 
         usageCounts = (UserDefaults.standard.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
         learnedBigrams = (UserDefaults.standard.dictionary(forKey: "bigrams") as? [String: Int]) ?? [:]
+        if let saved = UserDefaults.standard.string(forKey: "lang"), let restored = Lang(rawValue: saved) {
+            lang = restored
+        }
         if UserDefaults.standard.object(forKey: "sizeIndex") != nil {
             sizeIndex = min(max(UserDefaults.standard.integer(forKey: "sizeIndex"), 0), sizePresets.count - 1)
         }
@@ -262,14 +321,20 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: Categories
 
-    /// Tab 0 is Recents — computed from usage, falls back to a hint that
-    /// it fills up as words get used.
+    /// Tab 0 is Recents — computed from usage across both languages.
     private func allCategories() -> [(name: String, words: [VocabWord])] {
         let recents = usageCounts
             .sorted { $0.value > $1.value }
-            .prefix(12)
             .compactMap { vocabIndex[$0.key] }
-        return [("Recents", Array(recents))] + vocabulary
+        var seen = Set<String>()
+        var unique: [VocabWord] = []
+        for word in recents where !seen.contains(word.en) {
+            seen.insert(word.en)
+            unique.append(word)
+            if unique.count == 12 { break }
+        }
+        let recentsName = lang == .ms ? "Terkini" : "Recents"
+        return [(recentsName, unique)] + vocabulary.map { ($0.name(lang), $0.words) }
     }
 
     // MARK: Rows
@@ -285,15 +350,20 @@ final class KeyboardViewController: UIInputViewController {
             var wordRows: [[(KeyAction, String)]] = []
             for chunk in stride(from: 0, to: words.count, by: perRow) {
                 wordRows.append(words[chunk..<min(chunk + perRow, words.count)].map { word in
-                    (word.wordClass == .punct ? KeyAction.punct(word.text) : KeyAction.word(word.text), word.text)
+                    let text = word.text(lang)
+                    return (word.wordClass == .punct ? KeyAction.punct(text) : KeyAction.word(text), text)
                 })
             }
             if wordRows.isEmpty {
-                wordRows.append([(.category(1), "Words you use often will appear here — tap to go to Core")])
+                let hint = lang == .ms
+                    ? "Perkataan yang kerap digunakan akan muncul di sini"
+                    : "Words you use often will appear here — tap to go to Core"
+                wordRows.append([(.category(1), hint)])
             }
             wordRows.append([
-                (.toLetters, "abc"), (.space, "space"),
-                (.deleteWord, "⌫ word"), (.delete, "⌫"), (.ret, "return"),
+                (.toLetters, "abc"), (.space, lang == .ms ? "jarak" : "space"),
+                (.deleteWord, lang == .ms ? "⌫ kata" : "⌫ word"), (.delete, "⌫"),
+                (.ret, "return"), (.language, lang == .en ? "EN" : "MS"),
                 (.size, "⤢"), (.dismiss, "⌄"),
             ])
             return wordRows
@@ -402,7 +472,7 @@ final class KeyboardViewController: UIInputViewController {
                 let content = NSMutableAttributedString(
                     string: emoji + "\n", attributes: [.font: UIFont.systemFont(ofSize: 26)])
                 content.append(NSAttributedString(
-                    string: word.text, attributes: [
+                    string: text, attributes: [
                         .font: UIFont.systemFont(ofSize: 15, weight: .semibold),
                         .foregroundColor: highlighted ? UIColor.white : UIColor.black,
                     ]))
@@ -580,6 +650,11 @@ final class KeyboardViewController: UIInputViewController {
             heightConstraint.constant = sizePresets[sizeIndex]
         case .dismiss:
             dismissKeyboard()
+        case .language:
+            // Same positions, new labels — muscle memory survives the switch.
+            lang = lang == .en ? .ms : .en
+            UserDefaults.standard.set(lang.rawValue, forKey: "lang")
+            buildKeys()
         }
         updateSuggestions()
     }
@@ -648,8 +723,8 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Prediction (on-device only — no Full Access, no network)
 
     /// Grid mode: predict likely next words from learned bigrams, seeded
-    /// with sensible defaults. Predictions appear in the suggestion bar so
-    /// grid positions stay stable.
+    /// per language. Predictions appear in the suggestion bar so grid
+    /// positions stay stable.
     private func predictNextWords() -> [String] {
         let prev = atSentenceStart() ? "" : lastWord().lowercased()
         var scores: [String: Int] = [:]
@@ -658,7 +733,7 @@ final class KeyboardViewController: UIInputViewController {
         for (key, count) in learnedBigrams where key.hasPrefix(prefix) {
             scores[String(key.dropFirst(prefix.count)), default: 0] += count * 10
         }
-        for (i, word) in (seedBigrams[prev] ?? []).enumerated() {
+        for (i, word) in (seedBigrams[lang]?[prev] ?? []).enumerated() {
             scores[word, default: 0] += 3 - i
         }
         return scores.sorted { $0.value > $1.value }.prefix(3).map(\.key)
@@ -679,7 +754,7 @@ final class KeyboardViewController: UIInputViewController {
                 let checker = UITextChecker()
                 let range = NSRange(location: 0, length: word.utf16.count)
                 titles = Array((checker.completions(
-                    forPartialWordRange: range, in: word, language: "en_US") ?? []).prefix(3))
+                    forPartialWordRange: range, in: word, language: lang.spellCheckCode) ?? []).prefix(3))
             } else {
                 titles = []
             }

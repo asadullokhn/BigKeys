@@ -36,6 +36,7 @@ Every interaction decision traces to a specific research finding:
 - Letter keyboard (large-key QWERTY) and numbers layer as fallback, with system spell-checker word completions
 - Word-level delete (one tap removes the whole last word)
 - Punctuation cells that attach to the preceding word
+- Two languages: English and Malay (Bahasa Melayu), toggled by the EN/MS key. Language switching relabels cells in place — grid positions never move, so muscle memory survives the switch. Prediction seeds, category names, and spell-check completions all follow the active language. Malay translations are drafts pending verification with Fadillah
 - Three height presets cycled by the size key, persisted between sessions
 - Dismiss key, like Apple's iPad keyboard
 - Responsive layout: drops to a compact 4-column grid when the system narrows the keyboard (floating, Split View, Slide Over)
@@ -65,6 +66,7 @@ First run on a new device needs Developer Mode enabled (Settings → Privacy & S
 
 ## Known limitations / not yet decided
 
+- Malay vocabulary was drafted by the team, not by a native-speaking AAC user — verify every word with Fadillah before testing with Sayfullah. Singaporean Malay has colloquial forms a dictionary translation misses.
 - Vocabulary is hardcoded. Editable vocabulary shared from the container app requires an App Group, which for keyboard extensions requires Full Access — that's a real architecture decision to make deliberately, not stumble into.
 - No speech output. Audio in keyboard extensions is gated behind Full Access (this is exactly what Keeble does: on-device prediction free, speech gated). Same deliberate decision needed.
 - Apple Foundation Models sentence completion is on the roadmap, deliberately not in the MVP. Open research question: extensions may be sandboxed away from the on-device model — needs a 5-minute empirical test (`SystemLanguageModel.availability` from inside the extension) before that feature is ever promised.
