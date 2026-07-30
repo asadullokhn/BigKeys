@@ -257,7 +257,13 @@ final class KeyboardViewController: UIInputViewController {
 
     /// Top of the drawn keyboard band inside the container. Non-zero only
     /// when the system hands us an oversized container.
-    private var layoutYOffset: CGFloat = 0
+    fileprivate var layoutYOffset: CGFloat = 0
+
+    /// Paints only the actual keyboard band — the rest of an oversized
+    /// container stays transparent instead of a white wall.
+    private let boardBackground = UIView()
+    private var isRotating = false
+    private var pendingHeightFix = false
 
     private var keys: [Key] = []
     private var layer: Layer = .grid
@@ -280,7 +286,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .clear
 
         usageCounts = (UserDefaults.standard.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
         learnedBigrams = (UserDefaults.standard.dictionary(forKey: "bigrams") as? [String: Int]) ?? [:]
@@ -307,6 +313,9 @@ final class KeyboardViewController: UIInputViewController {
         trackingView.controller = self
         view.addSubview(trackingView)
 
+        boardBackground.backgroundColor = .systemBackground
+        trackingView.addSubview(boardBackground)
+
         buildSuggestionBar()
         buildKeys()
     }
@@ -320,6 +329,27 @@ final class KeyboardViewController: UIInputViewController {
             buildKeys()
         }
         layoutKeys()
+
+        // Self-heal: if the container is still oversized once rotation has
+        // settled, rebuild the height constraint from scratch — reasserting
+        // the existing one is not always enough to shrink the window.
+        let drift = view.bounds.height - sizePresets[sizeIndex]
+        if !isRotating, !pendingHeightFix, drift > 1 {
+            pendingHeightFix = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.view.removeConstraint(self.heightConstraint)
+                self.heightConstraint = NSLayoutConstraint(
+                    item: self.view!, attribute: .height, relatedBy: .equal,
+                    toItem: nil, attribute: .notAnAttribute, multiplier: 1,
+                    constant: self.sizePresets[self.sizeIndex])
+                self.heightConstraint.priority = .init(999)
+                self.view.addConstraint(self.heightConstraint)
+                self.view.setNeedsLayout()
+                self.view.layoutIfNeeded()
+                self.pendingHeightFix = false
+            }
+        }
     }
 
     // On rotation the system can hand the extension transient, oversized
@@ -327,6 +357,7 @@ final class KeyboardViewController: UIInputViewController {
     // settles back to its preset instead of staying huge.
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
+        isRotating = true
         coordinator.animate(alongsideTransition: { _ in
             self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
             self.view.setNeedsLayout()
@@ -340,6 +371,8 @@ final class KeyboardViewController: UIInputViewController {
             self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
             self.view.setNeedsLayout()
             self.view.layoutIfNeeded()
+            self.isRotating = false
+            self.view.setNeedsLayout()
         })
     }
 
@@ -552,6 +585,8 @@ final class KeyboardViewController: UIInputViewController {
         // leaving a dead band under them.
         let yOffset = fullBounds.height - bounds.height
         layoutYOffset = yOffset
+        boardBackground.frame = CGRect(
+            x: 0, y: yOffset, width: fullBounds.width, height: fullBounds.height - yOffset)
         let inset: CGFloat = 4
 
         let barWidth = bounds.width - inset * 2
@@ -827,6 +862,13 @@ final class KeyboardViewController: UIInputViewController {
 /// rather than touch-down.
 private final class TrackingView: UIView {
     weak var controller: KeyboardViewController?
+
+    // Let touches above the keyboard band fall through to the app instead
+    // of being swallowed by a transparent, oversized container.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if let controller, point.y < controller.layoutYOffset { return nil }
+        return super.hitTest(point, with: event)
+    }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
