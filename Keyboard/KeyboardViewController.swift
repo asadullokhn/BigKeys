@@ -255,6 +255,10 @@ final class KeyboardViewController: UIInputViewController {
         view.bounds.width > 0 && view.bounds.width < 500
     }
 
+    /// Top of the drawn keyboard band inside the container. Non-zero only
+    /// when the system hands us an oversized container.
+    private var layoutYOffset: CGFloat = 0
+
     private var keys: [Key] = []
     private var layer: Layer = .grid
     private var categoryIndex = 1 // Recents is 0; start on Core
@@ -292,6 +296,10 @@ final class KeyboardViewController: UIInputViewController {
             toItem: nil, attribute: .notAnAttribute, multiplier: 1, constant: sizePresets[sizeIndex])
         heightConstraint.priority = .init(999)
         view.addConstraint(heightConstraint)
+        // Make the system respect our height constraint for the keyboard
+        // window itself — without this, rotation can leave the container
+        // at a stale system-chosen height that our 999-priority loses to.
+        inputView?.allowsSelfSizing = true
 
         trackingView.frame = view.bounds
         trackingView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -323,6 +331,12 @@ final class KeyboardViewController: UIInputViewController {
             self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
             self.view.setNeedsLayout()
         }, completion: { _ in
+            // Nudge the constant so the system re-reads the constraint —
+            // reasserting the same value after rotation is silently ignored
+            // when the container kept a stale height.
+            self.heightConstraint.constant = self.sizePresets[self.sizeIndex] - 1
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
             self.heightConstraint.constant = self.sizePresets[self.sizeIndex]
             self.view.setNeedsLayout()
             self.view.layoutIfNeeded()
@@ -528,21 +542,28 @@ final class KeyboardViewController: UIInputViewController {
         // Never lay out against more height than the active preset — if the
         // container is transiently oversized (mid-rotation), keys would
         // otherwise scale up with it and stick that way.
-        var bounds = trackingView.bounds
+        let fullBounds = trackingView.bounds
+        var bounds = fullBounds
         bounds.size.height = min(bounds.height, sizePresets[sizeIndex])
         guard bounds.width > 0, !keys.isEmpty else { return }
+        // Anchor the keyboard band to the BOTTOM of the container: when the
+        // system hands us an oversized container after rotation, the gap
+        // opens above the keys (where the app content is) instead of
+        // leaving a dead band under them.
+        let yOffset = fullBounds.height - bounds.height
+        layoutYOffset = yOffset
         let inset: CGFloat = 4
 
         let barWidth = bounds.width - inset * 2
         let slotWidth = barWidth / 3
         for (i, button) in suggestionButtons.enumerated() {
             button.frame = CGRect(
-                x: inset + CGFloat(i) * slotWidth + 3, y: inset,
+                x: inset + CGFloat(i) * slotWidth + 3, y: yOffset + inset,
                 width: slotWidth - 6, height: topBarHeight - inset * 2)
         }
 
         var keyIndex = 0
-        var gridTop = topBarHeight
+        var gridTop = yOffset + topBarHeight
 
         if layer == .grid {
             let tabs = topBarKeys()
@@ -550,15 +571,15 @@ final class KeyboardViewController: UIInputViewController {
             let tabWidth = bounds.width / CGFloat(tabs.count)
             for i in 0..<tabs.count {
                 keys[keyIndex].view.frame = CGRect(
-                    x: CGFloat(i) * tabWidth + 2, y: topBarHeight + 2,
+                    x: CGFloat(i) * tabWidth + 2, y: yOffset + topBarHeight + 2,
                     width: tabWidth - 4, height: tabHeight - 4)
                 keyIndex += 1
             }
-            gridTop = topBarHeight + tabHeight
+            gridTop = yOffset + topBarHeight + tabHeight
         }
 
         let rowDefs = rows(for: layer)
-        let rowHeight = (bounds.height - gridTop) / CGFloat(rowDefs.count)
+        let rowHeight = (fullBounds.height - gridTop) / CGFloat(rowDefs.count)
 
         for (rowIdx, row) in rowDefs.enumerated() {
             let y = gridTop + CGFloat(rowIdx) * rowHeight
@@ -612,7 +633,7 @@ final class KeyboardViewController: UIInputViewController {
     /// No dead zones: any point below the suggestion bar maps to the
     /// nearest key by center distance.
     private func keyIndex(at point: CGPoint) -> Int? {
-        guard point.y > topBarHeight else { return nil } // suggestion buttons handle themselves
+        guard point.y > layoutYOffset + topBarHeight else { return nil } // suggestion buttons handle themselves
         if let globe = globeButton, globe.frame.contains(point) { return nil }
         var best: (index: Int, distance: CGFloat)?
         for (i, key) in keys.enumerated() {
