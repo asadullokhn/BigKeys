@@ -38,6 +38,23 @@ final class PinnedFrameTests: XCTestCase {
                       "tapping the 'want' cell should insert 'Want ' (sentence-start capitalization), got: \(value)")
     }
 
+    func testClearAllRequiresArmingTap() {
+        let app = launchToBigKeys()
+        app.staticTexts["want"].tap()
+        var value = practiceField(in: app).value as? String ?? ""
+        XCTAssertTrue(value.contains("Want"), "setup: word not inserted")
+
+        app.staticTexts["Clear all"].tap()
+        value = practiceField(in: app).value as? String ?? ""
+        XCTAssertTrue(value.contains("Want"), "first tap must only arm, not clear")
+        XCTAssertTrue(app.staticTexts["tap again"].waitForExistence(timeout: 2),
+                      "armed clear-all should relabel to 'tap again'")
+
+        app.staticTexts["tap again"].tap()
+        value = practiceField(in: app).value as? String ?? ""
+        XCTAssertFalse(value.contains("Want"), "second tap should clear the text")
+    }
+
     // MARK: helpers
 
     private func launchToBigKeys() -> XCUIApplication {

@@ -473,8 +473,16 @@ final class KeyboardViewController: UIInputViewController {
          (.dismiss, "⌄")]
     }
 
-    /// Dynamic Go label — Task 3 wires this to the field's returnKeyType.
-    private func goLabel() -> String { "return" }
+    /// Go key follows the field, like the system keyboard's return key.
+    private func goLabel() -> String {
+        switch textDocumentProxy.returnKeyType {
+        case .search?, .google?, .yahoo?: return "Search"
+        case .send?: return "Send"
+        case .go?: return "Go"
+        case .done?: return "Done"
+        default: return "return"
+        }
+    }
 
     /// A content cell that can span multiple grid slots (e.g. a wide
     /// space bar, or a big 2x2 category tile). Default span is 1x1 — a
@@ -803,7 +811,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func commit(_ action: KeyAction) {
         // Double-tap guard; deletes are exempt — repeats are intentional.
-        if action != .delete, action != .deleteWord,
+        if !isDebounceExempt(action),
            let last = lastCommit, last.action == action,
            Date().timeIntervalSince(last.at) < debounceInterval {
             return
@@ -835,8 +843,12 @@ final class KeyboardViewController: UIInputViewController {
             level = .letters; buildKeys()
         case .toNumbers:
             level = .numbers; buildKeys()
-        case .clearAll, .cursorLeft, .cursorRight:
-            break // Task 3
+        case .clearAll:
+            handleClearAll()
+        case .cursorLeft:
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: -1)
+        case .cursorRight:
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: 1)
         case .space:
             textDocumentProxy.insertText(" ")
         case .ret:
@@ -854,6 +866,47 @@ final class KeyboardViewController: UIInputViewController {
             buildKeys()
         }
         updateSuggestions()
+    }
+
+    /// Repeats are intentional for deletes and cursor movement; clear-all
+    /// has its own two-tap arm and must not have its second tap swallowed.
+    private func isDebounceExempt(_ action: KeyAction) -> Bool {
+        switch action {
+        case .delete, .deleteWord, .clearAll, .cursorLeft, .cursorRight: return true
+        default: return false
+        }
+    }
+
+    private func handleClearAll() {
+        if let armed = clearArmedAt, Date().timeIntervalSince(armed) < 3 {
+            clearArmedAt = nil
+            clearAllText()
+            buildKeys() // restore the "Clear all" label
+            return
+        }
+        clearArmedAt = Date()
+        buildKeys() // relabel to "tap again"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, self.clearArmedAt != nil else { return }
+            if Date().timeIntervalSince(self.clearArmedAt!) >= 3 {
+                self.clearArmedAt = nil
+                self.buildKeys() // disarm quietly
+            }
+        }
+    }
+
+    /// Clears everything the field exposes. Extensions only see a context
+    /// window; in his real use (messages, search) that is the whole text.
+    private func clearAllText() {
+        if let after = textDocumentProxy.documentContextAfterInput, !after.isEmpty {
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: after.count)
+        }
+        var passes = 0
+        while let before = textDocumentProxy.documentContextBeforeInput,
+              !before.isEmpty, passes < 200 {
+            for _ in 0..<before.count { textDocumentProxy.deleteBackward() }
+            passes += 1
+        }
     }
 
     private func contextBefore() -> String {
