@@ -1,4 +1,4 @@
-name: BigKeys
+name: Typikey
 options:
   bundleIdPrefix: com.asadullokh.ch5
   deploymentTarget:
@@ -13,38 +13,52 @@ settings:
     MARKETING_VERSION: "1.0"
     GENERATE_INFOPLIST_FILE: YES
 targets:
-  BigKeys:
+  Typikey:
     type: application
     platform: iOS
     sources: [App]
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Typikey
+        # TestFlight: answers the export-compliance question at upload time.
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
+        # Bundle ids predate the Typikey rename and stay put on purpose:
+        # the keyboard's enabled state on every device is keyed to them,
+        # and users never see them. The App Store Connect record binds to
+        # this id.
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_CFBundleDisplayName: BigKeys
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
-      - target: BigKeysKeyboard
+      - target: TypikeyKeyboard
         embed: true
-  BigKeysUITests:
+  TypikeyUITests:
     type: bundle.ui-testing
     platform: iOS
     sources: [UITests]
     dependencies:
-      - target: BigKeys
+      - target: Typikey
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys.uitests
-        TEST_TARGET_NAME: BigKeys
-  BigKeysKeyboard:
+        TEST_TARGET_NAME: Typikey
+  TypikeyKeyboard:
     type: app-extension
     platform: iOS
     sources: [Keyboard]
     info:
       path: Keyboard/Info.plist
       properties:
-        CFBundleDisplayName: BigKeys
+        CFBundleDisplayName: Typikey
+        ITSAppUsesNonExemptEncryption: false
         NSExtension:
           NSExtensionPointIdentifier: com.apple.keyboard-service
           NSExtensionAttributes:
@@ -57,11 +71,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys.keyboard
 schemes:
-  BigKeys:
+  Typikey:
     build:
       targets:
-        BigKeys: all
-        BigKeysUITests: [test]
+        Typikey: all
+        TypikeyUITests: [test]
     test:
       targets:
-        - BigKeysUITests
+        - TypikeyUITests

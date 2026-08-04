@@ -2,12 +2,12 @@ import XCTest
 
 // The redesign's new invariant: control keys occupy identical frames on
 // every level. Keys are plain UILabels, so they surface as staticTexts.
-// PRECONDITION (same as KeyboardHeightTests): BigKeys enabled on the
+// PRECONDITION (same as KeyboardHeightTests): Typikey enabled on the
 // simulator and Connect Hardware Keyboard OFF.
 final class PinnedFrameTests: XCTestCase {
 
     func testPinnedKeysIdenticalAcrossLevels() {
-        let app = launchToBigKeys()
+        let app = launchToTypikey()
 
         let pinned = ["Home", "Clear all", "⌫ word", "←", "⌫", "→", "⌄"]
         let baseline = frames(of: pinned, in: app)
@@ -30,7 +30,7 @@ final class PinnedFrameTests: XCTestCase {
     }
 
     func testHomeWordTapInsertsWord() {
-        let app = launchToBigKeys()
+        let app = launchToTypikey()
         app.staticTexts["want"].tap()
         let field = practiceField(in: app)
         let value = field.value as? String ?? ""
@@ -39,7 +39,7 @@ final class PinnedFrameTests: XCTestCase {
     }
 
     func testClearAllRequiresArmingTap() {
-        let app = launchToBigKeys()
+        let app = launchToTypikey()
         app.staticTexts["want"].tap()
         var value = practiceField(in: app).value as? String ?? ""
         XCTAssertTrue(value.contains("Want"), "setup: word not inserted")
@@ -56,7 +56,7 @@ final class PinnedFrameTests: XCTestCase {
     }
 
     func testManualLevelSurvivesReshow() {
-        let app = launchToBigKeys()
+        let app = launchToTypikey()
         app.staticTexts["abc"].tap()
         XCTAssertTrue(app.staticTexts["q"].waitForExistence(timeout: 3), "letters level did not open")
         app.staticTexts["⌄"].tap() // dismiss keyboard
@@ -67,7 +67,7 @@ final class PinnedFrameTests: XCTestCase {
 
     // MARK: helpers
 
-    private func launchToBigKeys() -> XCUIApplication {
+    private func launchToTypikey() -> XCUIApplication {
         let app = XCUIApplication()
         app.launch()
         XCUIDevice.shared.orientation = .portrait
@@ -80,7 +80,7 @@ final class PinnedFrameTests: XCTestCase {
             practiceField(in: app).tap()
         }
         XCTAssertTrue(app.staticTexts["Home"].waitForExistence(timeout: 5),
-                      "BigKeys home level not visible — is BigKeys the active keyboard?")
+                      "Typikey home level not visible — is Typikey the active keyboard?")
         return app
     }
 

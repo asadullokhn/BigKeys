@@ -9,7 +9,7 @@
 
 ## Before opening a PR
 
-- Build both targets (`BigKeys` app + `BigKeysKeyboard` extension) — the build must succeed.
+- Build both targets (`Typikey` app + `TypikeyKeyboard` extension) — the build must succeed.
 - Actually load the keyboard on a device or simulator and type with it. A keyboard that compiles but doesn't load is not done.
 - If you changed `project.yml`, run `xcodegen generate` and commit the regenerated project together with it.
 
