@@ -439,7 +439,13 @@ final class KeyboardViewController: UIInputViewController {
         // deficit above the (now-static) capped value forever, and this
         // block re-fires — and calls setNeedsLayout() — every single
         // layout pass indefinitely.
-        if !isRotating, let constraint = heightConstraint, view.bounds.height > 0,
+        // !isCompact: floating keyboard / Split View / Slide Over grants
+        // are small BY DESIGN — that is not the input-assistant-band
+        // shortfall this mechanism exists to compensate for. heightDeficit
+        // never decays on its own, so measuring a compact-mode grant here
+        // would let a float episode pin the deficit at the 160pt cap and
+        // then inflate the docked, full-width keyboard afterward.
+        if !isRotating, !isCompact, let constraint = heightConstraint, view.bounds.height > 0,
            view.bounds.height < constraint.constant - 1 {
             let deficit = min(constraint.constant - view.bounds.height, 160)
             if deficit > heightDeficit {
@@ -993,7 +999,8 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Committing
 
     private func commit(_ action: KeyAction) {
-        // Double-tap guard; deletes are exempt — repeats are intentional.
+        // Double-tap guard; delete, word-delete, clear-all, and the
+        // cursor arrows are exempt — repeats are intentional for those.
         if !isDebounceExempt(action),
            let last = lastCommit, last.action == action,
            Date().timeIntervalSince(last.at) < debounceInterval {
