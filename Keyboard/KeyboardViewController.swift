@@ -648,7 +648,14 @@ final class KeyboardViewController: UIInputViewController {
     private func layoutKeys() {
         let fullBounds = trackingView.bounds
         var bounds = fullBounds
-        bounds.size.height = min(bounds.height, sizePresets[sizeIndex])
+        // The system can hand the keyboard window LESS height than the
+        // preset asks for (iPadOS 26 reserves an input-assistant band).
+        // The band is bottom-anchored, so clamping to the real container
+        // height keeps every key on visible glass.
+        let visibleHeight = view.bounds.height > 0
+            ? min(view.bounds.height, sizePresets[sizeIndex])
+            : sizePresets[sizeIndex]
+        bounds.size.height = min(bounds.height, visibleHeight)
         guard bounds.width > 0, !keys.isEmpty else { return }
         let yOffset = fullBounds.height - bounds.height
         layoutYOffset = yOffset
