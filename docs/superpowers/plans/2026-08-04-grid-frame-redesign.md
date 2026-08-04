@@ -808,6 +808,7 @@ This intentionally moves grid cell positions ONCE, by team decision (the annotat
 - Clear all with two-tap arming; cursor arrow keys (debounce-exempt); Go key label follows the field
 - Field-type intent mapping applied once per field attach (search/URL/email -> letters, send -> Chat board, default -> home); never switches mid-typing
 - Compact width: word boards drop to 5 content columns, typing levels keep 10
+- Key-commit feedback: system input click + haptic impulse (haptics inert on iPad hardware; click is the audible feedback)
 - KeyboardHeightTests marker updated (Core -> Home); PinnedFrameTests added
 
 ## Testing
@@ -819,6 +820,61 @@ EOF
 ```
 
 Do NOT merge — @asadullokhn reviews. If any manual-checklist item failed or was skipped, say so explicitly in the PR body instead of deleting the line.
+
+---
+
+### Task 7: Key-commit feedback (input click + haptics)
+
+*(Added 2026-08-04 by user request, after Task 3 was dispatched. Executes between Task 5 and Task 6.)*
+
+**Files:**
+- Modify: `Keyboard/KeyboardViewController.swift` (commit path, TrackingView)
+
+**Interfaces:**
+- Consumes: `commit(_:)` and `TrackingView` from Task 2.
+- Produces: audible input click + haptic impulse on every committed key.
+
+- [ ] **Step 1: Implement**
+
+Make `TrackingView` adopt the input-click protocol (required for keyboards to play the system click without Full Access):
+
+```swift
+private final class TrackingView: UIView, UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool { true }
+```
+
+Add a prepared generator to the controller's properties:
+
+```swift
+    // Haptics are a no-op on iPads (no Taptic Engine) — wired anyway so an
+    // iPhone build gets them for free. The input click is the audible
+    // press feedback and needs no Full Access.
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+```
+
+At the top of `commit(_:)`, immediately AFTER the debounce guard returns (so swallowed double-taps stay silent), add:
+
+```swift
+        UIDevice.current.playInputClick()
+        impactFeedback.impactOccurred()
+```
+
+- [ ] **Step 2: Build, run the full UITest suite**
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+xcodebuild test -project BigKeys.xcodeproj -scheme BigKeys \
+  -destination 'platform=iOS Simulator,id=4FFBE35A-F5F7-41BD-A06B-F4420533EEC8' 2>&1 | tail -4
+```
+
+Expected: **TEST SUCCEEDED**. Click audibility is verified by ear on hardware; the suite verifies no behavioral regression.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add Keyboard/KeyboardViewController.swift
+git commit -m "Play input click and haptic impulse on key commit"
+```
 
 ---
 
