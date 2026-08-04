@@ -9,6 +9,7 @@ import FoundationModels
 /// the session and the keyboard behaves exactly as it did before this
 /// feature existed. On the simulator generation always fails, so the
 /// degraded path is the tested path.
+@MainActor
 final class CompletionEngine {
 
     struct Completion {
@@ -22,18 +23,25 @@ final class CompletionEngine {
     private var generation = 0
     private var consecutiveFailures = 0
     private var pendingWork: DispatchWorkItem?
+    private var inFlight: Task<Void, Never>?
 
     func requestCompletion(context: String,
                            vocabulary: [String],
                            onResult: @escaping (Completion?) -> Void) {
         pendingWork?.cancel()
+        inFlight?.cancel()
         generation += 1
         let token = generation
 
         guard !isDegraded else { onResult(nil); return }
 
         let work = DispatchWorkItem { [weak self] in
-            self?.generate(context: context, vocabulary: vocabulary, token: token, onResult: onResult)
+            // DispatchQueue.main guarantees we're already on the main thread here;
+            // assumeIsolated bridges into the MainActor-isolated generate() without
+            // an extra async hop.
+            MainActor.assumeIsolated {
+                self?.generate(context: context, vocabulary: vocabulary, token: token, onResult: onResult)
+            }
         }
         pendingWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + debounceInterval, execute: work)
@@ -41,28 +49,30 @@ final class CompletionEngine {
 
     private func deliver(_ completion: Completion?, token: Int,
                          onResult: @escaping (Completion?) -> Void) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, token == self.generation else { return }
-            onResult(completion)
-        }
+        guard token == generation else { return }
+        onResult(completion)
     }
 
     private func recordFailure() {
         consecutiveFailures += 1
+        session = nil
         if consecutiveFailures >= 2 {
             isDegraded = true
-            session = nil
         }
     }
 
     /// Splits the model's text into at most five clean words; nil when
-    /// nothing usable remains.
+    /// nothing usable remains. Trims punctuation glued to a word and drops
+    /// tokens with no letters or digits (bare "-" or "▸" isn't a word).
     private func sanitize(_ text: String) -> Completion? {
+        let punctuation = CharacterSet(charactersIn: ".!?,;:")
         let words = text
             .replacingOccurrences(of: "\n", with: " ")
             .split(separator: " ")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { $0.trimmingCharacters(in: punctuation) }
             .filter { !$0.isEmpty }
+            .filter { $0.rangeOfCharacter(from: .alphanumerics) != nil }
             .prefix(5)
         return words.isEmpty ? nil : Completion(words: Array(words))
     }
@@ -96,7 +106,7 @@ final class CompletionEngine {
         let liveSession = existing ?? LanguageModelSession()
         session = liveSession
 
-        Task { [weak self] in
+        inFlight = Task { [weak self] in
             guard let self else { return }
             let generator = Task {
                 try await liveSession.respond(to: prompt).content
@@ -105,19 +115,24 @@ final class CompletionEngine {
                 try await Task.sleep(nanoseconds: UInt64(self.timeout * 1_000_000_000))
                 generator.cancel()
             }
-            do {
-                let text = try await generator.value
-                watchdog.cancel()
-                await MainActor.run {
+            // Propagate outer-task cancellation (a superseding request) down into
+            // the in-flight respond() call, the same way the watchdog already does
+            // for timeouts, so a stale generation never keeps running concurrently
+            // with the next one.
+            await withTaskCancellationHandler {
+                do {
+                    let text = try await generator.value
+                    watchdog.cancel()
                     self.consecutiveFailures = 0
                     self.deliver(self.sanitize(text), token: token, onResult: onResult)
-                }
-            } catch {
-                watchdog.cancel()
-                await MainActor.run {
+                } catch {
+                    watchdog.cancel()
+                    guard !(error is CancellationError) else { return }
                     self.recordFailure()
                     self.deliver(nil, token: token, onResult: onResult)
                 }
+            } onCancel: {
+                generator.cancel()
             }
         }
     }
