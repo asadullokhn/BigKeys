@@ -330,6 +330,13 @@ final class KeyboardViewController: UIInputViewController {
     private var usageCounts: [String: Int] = [:]
     private var learnedBigrams: [String: Int] = [:]
 
+    // Phrase completion (spec 2026-08-04). completionWords is the current
+    // continuation; empty means none. Requests are issued only from the
+    // trigger points (commit / textDidChange), never from inside
+    // updateSuggestions — that would loop through onResult.
+    private let completionEngine = CompletionEngine()
+    private var completionWords: [String] = []
+
     // MARK: Lifecycle
 
     override func viewDidLoad() {
@@ -478,6 +485,7 @@ final class KeyboardViewController: UIInputViewController {
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         updateSuggestions()
+        requestPhraseCompletion()
     }
 
     // MARK: Categories
@@ -1026,14 +1034,19 @@ final class KeyboardViewController: UIInputViewController {
         case .deleteWord:
             deleteLastWord()
         case .home:
+            completionWords = []
             level = .home; buildKeys()
         case .toCategories:
+            completionWords = []
             level = .categories; buildKeys()
         case .toWords(let i):
+            completionWords = []
             level = .words(i); buildKeys()
         case .toLetters:
+            completionWords = []
             level = .letters; buildKeys()
         case .toNumbers:
+            completionWords = []
             level = .numbers; buildKeys()
         case .clearAll:
             handleClearAll()
@@ -1060,6 +1073,7 @@ final class KeyboardViewController: UIInputViewController {
             buildKeys()
         }
         updateSuggestions()
+        requestPhraseCompletion()
     }
 
     /// Repeats are intentional for deletes and cursor movement; clear-all
@@ -1183,6 +1197,25 @@ final class KeyboardViewController: UIInputViewController {
         return scores.sorted { $0.value > $1.value }.prefix(3).map(\.key)
     }
 
+    private func topVocabulary() -> [String] {
+        usageCounts.sorted { $0.value > $1.value }.prefix(40).map(\.key)
+    }
+
+    private func requestPhraseCompletion() {
+        guard isWordLevel, !completionEngine.isDegraded else {
+            completionWords = []
+            return
+        }
+        completionEngine.requestCompletion(
+            context: contextBefore(),
+            vocabulary: topVocabulary()
+        ) { [weak self] completion in
+            guard let self else { return }
+            self.completionWords = completion?.words ?? []
+            self.updateSuggestions()
+        }
+    }
+
     private func currentPartialWord() -> String {
         guard let context = textDocumentProxy.documentContextBeforeInput else { return "" }
         return context.split(separator: " ", omittingEmptySubsequences: false).last.map(String.init) ?? ""
@@ -1191,7 +1224,18 @@ final class KeyboardViewController: UIInputViewController {
     private func updateSuggestions() {
         let titles: [String]
         if isWordLevel {
-            titles = predictNextWords()
+            if !completionWords.isEmpty {
+                var slots: [String] = ["▸ " + completionWords[0]]
+                if completionWords.count >= 2 {
+                    slots.append(completionWords.joined(separator: " "))
+                }
+                if let bigram = predictNextWords().first {
+                    slots.append(bigram)
+                }
+                titles = Array(slots.prefix(3))
+            } else {
+                titles = predictNextWords()
+            }
         } else {
             let word = currentPartialWord()
             if word.count >= 2 {
@@ -1218,6 +1262,22 @@ final class KeyboardViewController: UIInputViewController {
         guard let title = sender.title(for: .normal) else { return }
         UIDevice.current.playInputClick()
         impactFeedback.impactOccurred()
+        if isWordLevel, !completionWords.isEmpty {
+            if title == "▸ " + completionWords[0] {
+                insertWord(completionWords[0])
+                completionWords = []
+                updateSuggestions()
+                requestPhraseCompletion()
+                return
+            }
+            if title == completionWords.joined(separator: " ") {
+                for word in completionWords { insertWord(word) }
+                completionWords = []
+                updateSuggestions()
+                requestPhraseCompletion()
+                return
+            }
+        }
         if isWordLevel {
             insertWord(title)
         } else {
