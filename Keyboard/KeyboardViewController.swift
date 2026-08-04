@@ -539,10 +539,7 @@ final class KeyboardViewController: UIInputViewController {
         globeButton?.removeFromSuperview()
         globeButton = nil
 
-        var content = contentRows(for: level)
-        if needsInputModeSwitchKey {
-            content[3][content[3].count - 1] = nil // globe takes the last bottom-row content cell
-        }
+        let content = contentRows(for: level)
 
         for row in 0..<4 {
             addKey(leftColumn[row], row: row, col: 0)
@@ -552,6 +549,9 @@ final class KeyboardViewController: UIInputViewController {
             addKey(rightColumn[row], row: row, col: contentColumns + 1)
         }
 
+        // The globe lives in the top suggestion bar (same slot on every
+        // level and every device), never in the content grid — it used
+        // to overwrite the last home cell ("haha"), silently dropping it.
         if needsInputModeSwitchKey {
             let globe = UIButton(type: .system)
             globe.setImage(UIImage(systemName: "globe"), for: .normal)
@@ -663,12 +663,22 @@ final class KeyboardViewController: UIInputViewController {
             x: 0, y: yOffset, width: fullBounds.width, height: fullBounds.height - yOffset)
         let inset: CGFloat = 4
 
-        let barWidth = bounds.width - inset * 2
+        // The globe gets a fixed square slot at the right end of the top
+        // bar — same place on every level and device — instead of living
+        // inside the content grid, where it used to silently overwrite
+        // whatever cell was last in the bottom row.
+        let globeWidth: CGFloat = globeButton != nil ? (topBarHeight - inset * 2) : 0
+        let barWidth = bounds.width - inset * 2 - globeWidth
         let slotWidth = barWidth / 3
         for (i, button) in suggestionButtons.enumerated() {
             button.frame = CGRect(
                 x: inset + CGFloat(i) * slotWidth + 3, y: yOffset + inset,
                 width: slotWidth - 6, height: topBarHeight - inset * 2)
+        }
+        if let globe = globeButton {
+            globe.frame = CGRect(
+                x: bounds.width - inset - globeWidth, y: yOffset + inset,
+                width: globeWidth, height: topBarHeight - inset * 2)
         }
 
         let cellW = bounds.width / CGFloat(contentColumns + 2)
@@ -679,12 +689,6 @@ final class KeyboardViewController: UIInputViewController {
             key.view.frame = CGRect(
                 x: CGFloat(key.col) * cellW + 3,
                 y: gridTop + CGFloat(key.row) * rowH + 3,
-                width: cellW - 6, height: rowH - 6)
-        }
-        if let globe = globeButton {
-            globe.frame = CGRect(
-                x: CGFloat(contentColumns) * cellW + 3,
-                y: gridTop + 3 * rowH + 3,
                 width: cellW - 6, height: rowH - 6)
         }
     }
@@ -714,10 +718,10 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// No dead zones: any point below the suggestion bar maps to the
-    /// nearest key by center distance.
+    /// nearest key by center distance. The globe now lives in the top
+    /// bar, so this guard already excludes it — no separate check needed.
     private func keyIndex(at point: CGPoint) -> Int? {
         guard point.y > layoutYOffset + topBarHeight else { return nil } // suggestion buttons handle themselves
-        if let globe = globeButton, globe.frame.contains(point) { return nil }
         var best: (index: Int, distance: CGFloat)?
         for (i, key) in keys.enumerated() {
             if key.view.frame.contains(point) { return i }
