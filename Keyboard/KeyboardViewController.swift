@@ -294,7 +294,10 @@ final class KeyboardViewController: UIInputViewController {
     // Compact (floating / Split View / Slide Over): word boards drop to 5
     // wide-enough columns showing the first 20 content cells; the typing
     // levels keep all 10 columns — a letter that isn't there at all is
-    // worse than a narrower key. Pinned columns never move.
+    // worse than a narrower key. Pinned columns never move: layoutKeys()
+    // sizes col 0 and the right pinned column from bounds.width alone
+    // (bounds.width / 12), never from contentColumns, so their frames are
+    // identical whether the content grid is 5 or 10 columns wide.
     private var contentColumns: Int {
         switch level {
         case .letters, .numbers: return 10
@@ -758,6 +761,11 @@ final class KeyboardViewController: UIInputViewController {
     private func buildKeys() {
         keys.forEach { $0.view.removeFromSuperview() }
         keys = []
+        // A mid-slide rebuild (e.g. clear-all's relabel, a level switch)
+        // can shrink the key count while a touch is still moving; a stale
+        // highlightedIndex from the old, larger array would then index
+        // out of bounds in the next touchMoved restyle.
+        highlightedIndex = nil
         globeButton?.removeFromSuperview()
         globeButton = nil
 
@@ -903,7 +911,19 @@ final class KeyboardViewController: UIInputViewController {
                 width: globeWidth, height: topBarHeight - inset * 2)
         }
 
-        let cellW = bounds.width / CGFloat(contentColumns + 2)
+        // Pinned columns are sized from bounds.width alone — never from
+        // contentColumns — so col 0 and the right pinned column land on
+        // the exact same frame whether the content grid is 5 columns
+        // (compact) or 10 (full width/typing levels). pinnedW is
+        // identical to the old uniform cell width (bounds.width / 12,
+        // since there are always 2 pinned columns + up to 10 content
+        // columns at full width); at contentColumns == 10 this makes
+        // contentW == pinnedW == bounds.width / 12 too, so the geometry
+        // below is numerically identical to the pre-fix single-cellW
+        // math at full width — only compact mode's content columns
+        // (still evenly split, just across 5 instead of 10) differ.
+        let pinnedW = bounds.width / 12
+        let contentW = (bounds.width - 2 * pinnedW) / CGFloat(contentColumns)
         let gridTop = yOffset + topBarHeight
         let rowH = (fullBounds.height - gridTop) / 4
         // A transient sub-topBarHeight container (before the height
@@ -912,10 +932,22 @@ final class KeyboardViewController: UIInputViewController {
         guard rowH > 0 else { return }
 
         for key in keys {
+            let x: CGFloat
+            let width: CGFloat
+            if key.col == 0 {
+                x = 0
+                width = pinnedW
+            } else if key.col == contentColumns + 1 {
+                x = bounds.width - pinnedW
+                width = pinnedW
+            } else {
+                x = pinnedW + CGFloat(key.col - 1) * contentW
+                width = contentW * CGFloat(key.colSpan)
+            }
             key.view.frame = CGRect(
-                x: CGFloat(key.col) * cellW + 3,
+                x: x + 3,
                 y: gridTop + CGFloat(key.row) * rowH + 3,
-                width: cellW * CGFloat(key.colSpan) - 6, height: rowH * CGFloat(key.rowSpan) - 6)
+                width: width - 6, height: rowH * CGFloat(key.rowSpan) - 6)
         }
     }
 
