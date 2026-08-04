@@ -1177,6 +1177,8 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func suggestionTapped(_ sender: UIButton) {
         guard let title = sender.title(for: .normal) else { return }
+        UIDevice.current.playInputClick()
+        impactFeedback.impactOccurred()
         if isWordLevel {
             insertWord(title)
         } else {
