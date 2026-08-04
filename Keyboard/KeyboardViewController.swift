@@ -247,6 +247,8 @@ final class KeyboardViewController: UIInputViewController {
         let view: UILabel
         let row: Int
         let col: Int // 0...contentColumns+1
+        let colSpan: Int
+        let rowSpan: Int
     }
 
     // Three height presets, cycled by the ⤢ key like Apple's keyboard
@@ -440,71 +442,98 @@ final class KeyboardViewController: UIInputViewController {
     /// Dynamic Go label — Task 3 wires this to the field's returnKeyType.
     private func goLabel() -> String { "return" }
 
+    /// A content cell that can span multiple grid slots (e.g. a wide
+    /// space bar, or a big 2x2 category tile). Default span is 1x1 — a
+    /// normal single cell.
+    private struct ContentCell {
+        let action: KeyAction
+        let label: String
+        let colSpan: Int
+        let rowSpan: Int
+
+        init(_ action: KeyAction, _ label: String, colSpan: Int = 1, rowSpan: Int = 1) {
+            self.action = action
+            self.label = label
+            self.colSpan = colSpan
+            self.rowSpan = rowSpan
+        }
+    }
+
     /// Core + Chat fill the home board: 36 word cells + 4 nav cells = 4x10.
     private var homeWords: [VocabWord] {
         (vocabulary.first { $0.en == "Core" }?.words ?? []) +
         (vocabulary.first { $0.en == "Chat" }?.words ?? [])
     }
 
-    private func wordCell(_ word: VocabWord) -> (KeyAction, String) {
+    private func wordCell(_ word: VocabWord) -> ContentCell {
         let text = word.text(lang)
-        return (word.wordClass == .punct ? KeyAction.punct(text) : .word(text), text)
+        return ContentCell(word.wordClass == .punct ? .punct(text) : .word(text), text)
     }
 
-    private func contentRows(for level: Level) -> [[(KeyAction, String)?]] {
+    private func contentRows(for level: Level) -> [[ContentCell?]] {
         let cols = contentColumns
         switch level {
         case .home:
-            var cells: [(KeyAction, String)?] = [
-                (.toCategories, "Categories"),
-                (.toLetters, "abc"),
-                (.language, lang == .en ? "EN" : "MS"),
-                (.size, "⤢"),
+            var cells: [ContentCell?] = [
+                ContentCell(.toCategories, "Categories"),
+                ContentCell(.toLetters, "abc"),
+                ContentCell(.language, lang == .en ? "EN" : "MS"),
+                ContentCell(.size, "⤢"),
             ]
             cells += homeWords.map { Optional(wordCell($0)) }
             return chunk(cells, into: cols)
         case .categories:
-            let cells = allCategories().enumerated().map { i, category in
-                Optional((KeyAction.toWords(i), category.name))
+            // Big targets suit the AAC use case: tile the full content
+            // area as 5x2 slots, each slot a 2x2 block of grid cells.
+            // 9 categories fill 9 of the 10 slots; the last 2x2 region
+            // stays empty (nearest-key gives it to an adjacent category).
+            var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
+            for (i, category) in allCategories().prefix(9).enumerated() {
+                let slotRow = i / 5, slotCol = i % 5
+                rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
             }
-            return chunk(cells, into: cols)
+            return rows
         case .words(let index):
             let categories = allCategories()
-            var cells: [(KeyAction, String)?] =
-                (index < categories.count ? categories[index].words : []).map { Optional(wordCell($0)) }
-            if cells.isEmpty {
+            let words = index < categories.count ? categories[index].words : []
+            if words.isEmpty {
                 let hint = lang == .ms
                     ? "Perkataan yang kerap digunakan akan muncul di sini"
                     : "Words you use often will appear here"
-                cells = [(.toWords(1), hint)]
+                var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
+                rows[0][0] = ContentCell(.toWords(1), hint, colSpan: cols)
+                return rows
             }
+            let cells: [ContentCell?] = words.map { Optional(wordCell($0)) }
             return chunk(cells, into: cols)
         case .letters:
-            var rows: [[(KeyAction, String)?]] = [
-                "qwertyuiop".map { (KeyAction.char(String($0)), String($0)) },
-                "asdfghjkl".map { (KeyAction.char(String($0)), String($0)) } + [(.shift, "⇧")],
-                "zxcvbnm".map { (KeyAction.char(String($0)), String($0)) }
-                    + [(.char(","), ","), (.char("."), "."), (.char("?"), "?")],
-                [(.space, "space"), (.toNumbers, "123")],
+            var rows: [[ContentCell?]] = [
+                "qwertyuiop".map { Optional(ContentCell(.char(String($0)), String($0))) },
+                "asdfghjkl".map { Optional(ContentCell(.char(String($0)), String($0))) } + [Optional(ContentCell(.shift, "⇧"))],
+                "zxcvbnm".map { Optional(ContentCell(.char(String($0)), String($0))) }
+                    + [Optional(ContentCell(.char(","), ",")), Optional(ContentCell(.char("."), ".")), Optional(ContentCell(.char("?"), "?"))],
+                Array(repeating: nil, count: cols),
             ]
-            rows[3] += Array(repeating: nil, count: 10 - rows[3].count)
+            rows[3][0] = ContentCell(.space, "space", colSpan: 8)
+            rows[3][8] = ContentCell(.toNumbers, "123", colSpan: 2)
             return rows
         case .numbers:
-            var rows: [[(KeyAction, String)?]] = [
-                "1234567890".map { (KeyAction.char(String($0)), String($0)) },
-                ["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""].map { (KeyAction.char($0), $0) },
-                [".", ",", "?", "!", "'"].map { (KeyAction.char($0), $0) },
-                [(.space, "space"), (.toLetters, "abc")],
+            var rows: [[ContentCell?]] = [
+                "1234567890".map { Optional(ContentCell(.char(String($0)), String($0))) },
+                ["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""].map { Optional(ContentCell(.char($0), $0)) },
+                [".", ",", "?", "!", "'"].map { Optional(ContentCell(.char($0), $0)) },
+                Array(repeating: nil, count: cols),
             ]
-            rows[2] += Array(repeating: nil, count: 10 - rows[2].count)
-            rows[3] += Array(repeating: nil, count: 10 - rows[3].count)
+            rows[2] += Array(repeating: nil, count: cols - rows[2].count)
+            rows[3][0] = ContentCell(.space, "space", colSpan: 8)
+            rows[3][8] = ContentCell(.toLetters, "abc", colSpan: 2)
             return rows
         }
     }
 
     /// Pack cells row-major into exactly 4 rows of `cols`, padding with nil.
-    private func chunk(_ cells: [(KeyAction, String)?], into cols: Int) -> [[(KeyAction, String)?]] {
-        var rows: [[(KeyAction, String)?]] = []
+    private func chunk(_ cells: [ContentCell?], into cols: Int) -> [[ContentCell?]] {
+        var rows: [[ContentCell?]] = []
         for start in stride(from: 0, to: cells.count, by: cols) {
             rows.append(Array(cells[start..<min(start + cols, cells.count)]))
         }
@@ -544,7 +573,9 @@ final class KeyboardViewController: UIInputViewController {
         for row in 0..<4 {
             addKey(leftColumn[row], row: row, col: 0)
             for (i, cell) in content[row].enumerated() {
-                if let cell { addKey(cell, row: row, col: i + 1) }
+                if let cell {
+                    addKey((cell.action, cell.label), row: row, col: i + 1, colSpan: cell.colSpan, rowSpan: cell.rowSpan)
+                }
             }
             addKey(rightColumn[row], row: row, col: contentColumns + 1)
         }
@@ -567,7 +598,7 @@ final class KeyboardViewController: UIInputViewController {
         view.setNeedsLayout()
     }
 
-    private func addKey(_ def: (KeyAction, String), row: Int, col: Int) {
+    private func addKey(_ def: (KeyAction, String), row: Int, col: Int, colSpan: Int = 1, rowSpan: Int = 1) {
         let keyLabel = UILabel()
         keyLabel.numberOfLines = 2
         keyLabel.textAlignment = .center
@@ -578,7 +609,7 @@ final class KeyboardViewController: UIInputViewController {
         keyLabel.isUserInteractionEnabled = false
         style(keyLabel, action: def.0, label: def.1, highlighted: false)
         trackingView.addSubview(keyLabel)
-        keys.append(Key(action: def.0, label: def.1, view: keyLabel, row: row, col: col))
+        keys.append(Key(action: def.0, label: def.1, view: keyLabel, row: row, col: col, colSpan: colSpan, rowSpan: rowSpan))
     }
 
     private func style(_ label: UILabel, action: KeyAction, label text: String, highlighted: Bool) {
@@ -689,7 +720,7 @@ final class KeyboardViewController: UIInputViewController {
             key.view.frame = CGRect(
                 x: CGFloat(key.col) * cellW + 3,
                 y: gridTop + CGFloat(key.row) * rowH + 3,
-                width: cellW - 6, height: rowH - 6)
+                width: cellW * CGFloat(key.colSpan) - 6, height: rowH * CGFloat(key.rowSpan) - 6)
         }
     }
 
