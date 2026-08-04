@@ -43,7 +43,7 @@ Append to `UITests/PinnedFrameTests.swift` (inside the class):
     // asserts the degrade contract: the bar and typing behave exactly as
     // before the completion feature existed.
     func testDegradedCompletionKeepsBarWorking() {
-        let app = launchToBigKeys()
+        let app = launchToTypikey()
         app.staticTexts["want"].tap()
         app.staticTexts["I"].tap()
         let value = practiceField(in: app).value as? String ?? ""

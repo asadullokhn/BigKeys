@@ -1049,6 +1049,7 @@ final class KeyboardViewController: UIInputViewController {
             completionWords = []
             level = .numbers; buildKeys()
         case .clearAll:
+            completionWords = []
             handleClearAll()
         case .cursorLeft:
             textDocumentProxy.adjustTextPosition(byCharacterOffset: -1)
@@ -1067,6 +1068,7 @@ final class KeyboardViewController: UIInputViewController {
             persistPendingRestore(signature: signature, level: level)
             dismissKeyboard()
         case .language:
+            completionWords = []
             // Same positions, new labels — muscle memory survives the switch.
             lang = lang == .en ? .ms : .en
             UserDefaults.standard.set(lang.rawValue, forKey: "lang")
