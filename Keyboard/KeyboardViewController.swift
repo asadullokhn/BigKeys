@@ -358,13 +358,21 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillAppear(animated)
         heightConstraint?.constant = requestedHeight
         let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
+        // Unconditional and unconditionally FIRST: reads and clears any
+        // pending restore on every single appearance, on every instance,
+        // whether or not this instance's own lastIntentSignature already
+        // matches. A note must never outlive the one appearance it was
+        // written for — see consumePendingRestore.
+        let restored = consumePendingRestore(matching: signature)
         if signature != lastIntentSignature {
             lastIntentSignature = signature
-            if let restored = consumePendingRestore(matching: signature) {
+            if let restored {
                 level = restored
             } else {
                 applyIntentLevel()
             }
+        } else if let restored {
+            level = restored // surviving instance after a ⌄ dismiss+retap: harmless reassert
         }
         buildKeys() // also refreshes the Go label for the new field
     }
@@ -493,26 +501,36 @@ final class KeyboardViewController: UIInputViewController {
     /// switches mid-typing. Manual navigation always wins afterwards.
     ///
     /// Keyboard extensions have no field-identity API, so `viewWillAppear`
-    /// re-applies this only when the field's keyboardType/returnKeyType
-    /// signature differs from the last one seen (see `lastIntentSignature`).
-    /// A same-signature re-show preserves whatever level the user
-    /// navigated to manually — with one wrinkle: tapping the in-keyboard
-    /// ⌄ key (see `commit(.dismiss)`) can tear down and recreate this
-    /// whole controller instance before the field is retapped, which
-    /// would reset `lastIntentSignature` to nil and silently lose the
-    /// manual navigation an in-memory-only guard was meant to protect.
-    /// `commit(.dismiss)` hands the current signature+level to
-    /// `persistPendingRestore`, a one-shot UserDefaults note that the
-    /// very next `viewWillAppear` — on whatever instance handles it —
-    /// consumes via `consumePendingRestore` and clears immediately,
-    /// whether or not the signature still matches. That single-use
-    /// design is deliberate: it survives exactly the reshow it exists
-    /// for, but can never accumulate into a standing override that
-    /// leaks into an unrelated, later field. Known accepted miss:
-    /// retapping a *different* field that happens to share the exact
-    /// same signature right after a dismiss inherits the dismissed
-    /// field's level instead of getting a fresh mapping — there is no
-    /// way to tell that case apart from a re-show of the same field.
+    /// only recomputes this mapping when the field's keyboardType/
+    /// returnKeyType signature differs from the last one THIS INSTANCE
+    /// saw (`lastIntentSignature`, plain in-memory — correct whenever the
+    /// instance itself survives the reshow, e.g. ordinary backgrounding/
+    /// foregrounding of a still-visible keyboard).
+    ///
+    /// Tapping the in-keyboard ⌄ key (`commit(.dismiss)`) can additionally
+    /// tear down and recreate the whole controller instance before the
+    /// field is retapped — instance survival across that specific
+    /// dismiss+retap is NOT an API guarantee either way, so
+    /// `commit(.dismiss)` also writes the current signature, level, and
+    /// a timestamp to UserDefaults via `persistPendingRestore`.
+    /// `viewWillAppear` calls `consumePendingRestore` UNCONDITIONALLY,
+    /// once, at the very top of every appearance — on every instance,
+    /// regardless of whether that instance's own `lastIntentSignature`
+    /// already matches — and the note is always read and cleared
+    /// together in that one call. It is applied only if the signature
+    /// still matches and it is no older than `pendingRestoreTTL` (120s).
+    /// That unconditional consume is what keeps the note from surviving
+    /// past the single reshow it was written for: a note nobody follows
+    /// up on (dismissed, never retapped) cannot linger to ambush some
+    /// unrelated later field that happens to share the same signature —
+    /// it is gone (read and cleared) the very next time ANY field
+    /// attaches, matching or not.
+    ///
+    /// Known accepted miss: retapping a *different* field that happens
+    /// to share the exact same signature within the TTL window of a
+    /// dismiss inherits the dismissed field's level instead of getting a
+    /// fresh mapping — there is no way to tell that case apart from a
+    /// re-show of the same field.
     private func applyIntentLevel() {
         switch textDocumentProxy.keyboardType {
         case .numberPad?, .decimalPad?, .phonePad?:
@@ -529,11 +547,18 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
+    /// A restore only makes sense moments after a dismiss — past this
+    /// age a note is more likely to ambush some unrelated later field
+    /// than to reflect a genuine reshow, so consumePendingRestore treats
+    /// it as absent (while still clearing it).
+    private let pendingRestoreTTL: TimeInterval = 120
+
     /// Called right before `dismissKeyboard()` so the level survives even
     /// if dismissing tears down this controller instance.
     private func persistPendingRestore(signature: String, level: Level) {
         let defaults = UserDefaults.standard
         defaults.set(signature, forKey: "pendingRestoreSignature")
+        defaults.set(Date().timeIntervalSince1970, forKey: "pendingRestoreTimestamp")
         switch level {
         case .home: defaults.set("home", forKey: "pendingRestoreLevel")
         case .categories: defaults.set("categories", forKey: "pendingRestoreLevel")
@@ -545,20 +570,28 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// Consumes (clears) any pending restore from a prior dismiss,
-    /// returning the level it held only if it was left for exactly this
-    /// field signature. Always clears — a stale note left by a dismiss
-    /// nobody followed up on must not linger to ambush some later,
-    /// unrelated field that happens to share a signature.
+    /// Reads AND clears any pending restore from a prior dismiss —
+    /// called unconditionally, once, at the top of every
+    /// `viewWillAppear`, regardless of whether the caller's own
+    /// `lastIntentSignature` already matches. That unconditional call is
+    /// what guarantees a note never outlives the single appearance it
+    /// was written for: it is gone after this one read, whether or not
+    /// it matched. Returns the saved level only when the signature still
+    /// matches and the note is fresh (see `pendingRestoreTTL`); returns
+    /// nil (having still cleared it) otherwise.
     private func consumePendingRestore(matching signature: String) -> Level? {
         let defaults = UserDefaults.standard
         let pendingSignature = defaults.string(forKey: "pendingRestoreSignature")
         let pendingLevel = defaults.string(forKey: "pendingRestoreLevel")
         let pendingWordsIndex = defaults.integer(forKey: "pendingRestoreWordsIndex")
+        let pendingTimestamp = defaults.object(forKey: "pendingRestoreTimestamp") as? TimeInterval
         defaults.removeObject(forKey: "pendingRestoreSignature")
         defaults.removeObject(forKey: "pendingRestoreLevel")
         defaults.removeObject(forKey: "pendingRestoreWordsIndex")
-        guard pendingSignature == signature else { return nil }
+        defaults.removeObject(forKey: "pendingRestoreTimestamp")
+        guard pendingSignature == signature,
+              let pendingTimestamp, Date().timeIntervalSince1970 - pendingTimestamp <= pendingRestoreTTL
+        else { return nil }
         switch pendingLevel {
         case "home": return .home
         case "categories": return .categories
