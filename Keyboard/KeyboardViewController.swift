@@ -356,6 +356,8 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         heightConstraint?.constant = requestedHeight
+        applyIntentLevel()
+        buildKeys() // also refreshes the Go label for the new field
     }
 
     override func viewDidLayoutSubviews() {
@@ -471,6 +473,29 @@ final class KeyboardViewController: UIInputViewController {
          (.ret, goLabel()),
          (.cursorRight, "→"),
          (.dismiss, "⌄")]
+    }
+
+    /// allCategories() index of the Chat board (offset 1 for Recents).
+    private var chatWordsIndex: Int {
+        (vocabulary.firstIndex { $0.en == "Chat" } ?? 0) + 1
+    }
+
+    /// Spec: applied once when the keyboard attaches to a field; never
+    /// switches mid-typing. Manual navigation always wins afterwards.
+    private func applyIntentLevel() {
+        switch textDocumentProxy.keyboardType {
+        case .numberPad?, .decimalPad?, .phonePad?:
+            level = .numbers; return
+        case .emailAddress?, .URL?, .webSearch?, .asciiCapable?:
+            level = .letters; return
+        default:
+            break
+        }
+        switch textDocumentProxy.returnKeyType {
+        case .search?, .google?, .yahoo?: level = .letters
+        case .send?: level = .words(chatWordsIndex)
+        default: level = .home
+        }
     }
 
     /// Go key follows the field, like the system keyboard's return key.
