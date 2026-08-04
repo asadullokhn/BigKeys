@@ -263,6 +263,15 @@ final class KeyboardViewController: UIInputViewController {
     private let topBarHeight: CGFloat = 56
     private let debounceInterval: TimeInterval = 0.5
 
+    // The system can grant the extension's window LESS height than we
+    // request (iPadOS 26 reserves an input-assistant band above
+    // third-party keyboards). heightDeficit accumulates the measured
+    // shortfall so the REQUEST compensates for it; requestedHeight is
+    // what we ask the constraint for everywhere we used to ask for the
+    // raw preset. Capped at 160 so it can never runaway.
+    private var heightDeficit: CGFloat = 0
+    private var requestedHeight: CGFloat { sizePresets[sizeIndex] + heightDeficit }
+
     private var isCompact: Bool {
         view.bounds.width > 0 && view.bounds.width < 500
     }
@@ -346,7 +355,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        heightConstraint?.constant = sizePresets[sizeIndex]
+        heightConstraint?.constant = requestedHeight
     }
 
     override func viewDidLayoutSubviews() {
@@ -362,7 +371,9 @@ final class KeyboardViewController: UIInputViewController {
         // Self-heal: if the container is still oversized once rotation has
         // settled, rebuild the height constraint from scratch — reasserting
         // the existing one is not always enough to shrink the window.
-        let drift = trackingView.bounds.height - sizePresets[sizeIndex]
+        // Compares against requestedHeight (not the raw preset) so it
+        // doesn't fight the undersize compensation below.
+        let drift = trackingView.bounds.height - requestedHeight
         if !isRotating, !pendingHeightFix, drift > 1, healAttempts < 2, heightConstraint != nil {
             pendingHeightFix = true
             healAttempts += 1
@@ -370,13 +381,36 @@ final class KeyboardViewController: UIInputViewController {
                 guard let self, let constraint = self.heightConstraint else { return }
                 // A genuine value change — same-value updates are no-ops to
                 // the layout engine and never shrink the stale window.
-                constraint.constant = self.sizePresets[self.sizeIndex] - 2
+                constraint.constant = self.requestedHeight - 2
                 self.view.setNeedsLayout()
                 self.view.layoutIfNeeded()
-                constraint.constant = self.sizePresets[self.sizeIndex]
+                constraint.constant = self.requestedHeight
                 self.view.setNeedsLayout()
                 self.view.layoutIfNeeded()
                 self.pendingHeightFix = false
+            }
+        }
+
+        // Compensate: the system can hand the extension LESS height than
+        // trackingView requests (iPadOS 26 reserves an input-assistant
+        // band above third-party keyboards). Measure the shortfall
+        // against the real container and bump the request by exactly
+        // that much — guarded to escalate only when a NEW, larger
+        // deficit is measured, so this can never compound into the
+        // historic growth-loop bug documented at the top of this file.
+        // The 160pt cap is applied BEFORE the comparison (not just to
+        // the stored value) — otherwise, once heightDeficit is capped,
+        // a stale/lagging view.bounds.height keeps reporting a raw
+        // deficit above the (now-static) capped value forever, and this
+        // block re-fires — and calls setNeedsLayout() — every single
+        // layout pass indefinitely.
+        if !isRotating, let constraint = heightConstraint, view.bounds.height > 0,
+           view.bounds.height < constraint.constant - 1 {
+            let deficit = min(constraint.constant - view.bounds.height, 160)
+            if deficit > heightDeficit {
+                heightDeficit = deficit
+                constraint.constant = requestedHeight
+                view.setNeedsLayout()
             }
         }
     }
@@ -389,10 +423,10 @@ final class KeyboardViewController: UIInputViewController {
         isRotating = true
         healAttempts = 0
         coordinator.animate(alongsideTransition: { _ in
-            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
+            self.heightConstraint?.constant = self.requestedHeight
             self.view.setNeedsLayout()
         }, completion: { _ in
-            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
+            self.heightConstraint?.constant = self.requestedHeight
             self.view.setNeedsLayout()
             self.view.layoutIfNeeded()
             self.isRotating = false
@@ -679,14 +713,12 @@ final class KeyboardViewController: UIInputViewController {
     private func layoutKeys() {
         let fullBounds = trackingView.bounds
         var bounds = fullBounds
-        // The system can hand the keyboard window LESS height than the
-        // preset asks for (iPadOS 26 reserves an input-assistant band).
-        // The band is bottom-anchored, so clamping to the real container
-        // height keeps every key on visible glass.
-        let visibleHeight = view.bounds.height > 0
-            ? min(view.bounds.height, sizePresets[sizeIndex])
-            : sizePresets[sizeIndex]
-        bounds.size.height = min(bounds.height, visibleHeight)
+        // viewDidLayoutSubviews compensates the height REQUEST when the
+        // system grants less than we asked for; this clamp is only a
+        // defensive floor for the transient frame before that lands, so
+        // it targets the raw preset — not the (possibly inflated)
+        // requested height — and converges to the designed size.
+        bounds.size.height = min(bounds.height, min(view.bounds.height > 0 ? view.bounds.height : sizePresets[sizeIndex], sizePresets[sizeIndex]))
         guard bounds.width > 0, !keys.isEmpty else { return }
         let yOffset = fullBounds.height - bounds.height
         layoutYOffset = yOffset
@@ -715,6 +747,10 @@ final class KeyboardViewController: UIInputViewController {
         let cellW = bounds.width / CGFloat(contentColumns + 2)
         let gridTop = yOffset + topBarHeight
         let rowH = (fullBounds.height - gridTop) / 4
+        // A transient sub-topBarHeight container (before the height
+        // compensation above lands) would otherwise yield negative
+        // frames here — bail rather than draw them.
+        guard rowH > 0 else { return }
 
         for key in keys {
             key.view.frame = CGRect(
@@ -808,7 +844,7 @@ final class KeyboardViewController: UIInputViewController {
         case .size:
             sizeIndex = (sizeIndex + 1) % sizePresets.count
             UserDefaults.standard.set(sizeIndex, forKey: "sizeIndex")
-            heightConstraint?.constant = sizePresets[sizeIndex]
+            heightConstraint?.constant = requestedHeight
         case .dismiss:
             dismissKeyboard()
         case .language:
