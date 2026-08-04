@@ -10,6 +10,7 @@
 		4F2971AAB04CB45F9F3A0D2B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */; };
 		591312BBAA426D1DE2ABB2BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 238704140C8DFC7E10D738C7 /* Assets.xcassets */; };
 		B9274BDBCA7F7A765DA6CCD7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */; };
+		BD72207B7019C86BCF8699CE /* CompletionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */; };
 		C5DE9CF6E675B6572A25B3F0 /* KeyboardHeightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D977763A87F89006584A3902 /* KeyboardHeightTests.swift */; };
 		DE071B07D2A8FA05715A5ED8 /* TypikeyKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F83C0D6BAF2B10D4444DD9A7 /* TypikeyKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EED48B258A0595CE57451BAC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */; };
@@ -55,6 +56,7 @@
 		671DF4A1D7A2DABAD334557F /* TypikeyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TypikeyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FA3846751FF38D84B3414E5 /* TypikeyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypikeyApp.swift; sourceTree = "<group>"; };
 		8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionEngine.swift; sourceTree = "<group>"; };
 		D977763A87F89006584A3902 /* KeyboardHeightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHeightTests.swift; sourceTree = "<group>"; };
 		DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -107,6 +109,7 @@
 		BC0B541BBA06AE32F05B7232 /* Keyboard */ = {
 			isa = PBXGroup;
 			children = (
+				BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */,
 				F6AB8DF9F06A51C18A94A9DE /* Info.plist */,
 				8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */,
 				DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */,
@@ -251,6 +254,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD72207B7019C86BCF8699CE /* CompletionEngine.swift in Sources */,
 				4F2971AAB04CB45F9F3A0D2B /* KeyboardViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
