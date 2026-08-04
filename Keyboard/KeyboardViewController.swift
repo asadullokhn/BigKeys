@@ -1229,7 +1229,9 @@ final class KeyboardViewController: UIInputViewController {
                 if completionWords.count >= 2 {
                     slots.append(completionWords.joined(separator: " "))
                 }
-                if let bigram = predictNextWords().first {
+                if let bigram = predictNextWords().first,
+                   !slots.contains(bigram),
+                   bigram != completionWords[0] {
                     slots.append(bigram)
                 }
                 titles = Array(slots.prefix(3))
