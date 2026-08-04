@@ -61,16 +61,24 @@ final class CompletionEngine {
         }
     }
 
+    private static let trailingPunctuation = ".!?,;:"
+
     /// Splits the model's text into at most five clean words; nil when
-    /// nothing usable remains. Trims punctuation glued to a word and drops
-    /// tokens with no letters or digits (bare "-" or "▸" isn't a word).
+    /// nothing usable remains. Trims punctuation glued to the end of a word
+    /// and drops tokens with no letters or digits (bare "-" or "▸" isn't a
+    /// word).
     private func sanitize(_ text: String) -> Completion? {
-        let punctuation = CharacterSet(charactersIn: ".!?,;:")
         let words = text
             .replacingOccurrences(of: "\n", with: " ")
             .split(separator: " ")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .map { $0.trimmingCharacters(in: punctuation) }
+            .map { token -> String in
+                var token = token
+                while let last = token.last, Self.trailingPunctuation.contains(last) {
+                    token.removeLast()
+                }
+                return token
+            }
             .filter { !$0.isEmpty }
             .filter { $0.rangeOfCharacter(from: .alphanumerics) != nil }
             .prefix(5)
@@ -105,14 +113,18 @@ final class CompletionEngine {
         let existing = session as? LanguageModelSession
         let liveSession = existing ?? LanguageModelSession()
         session = liveSession
+        let watchdogTimeout = timeout
 
         inFlight = Task { [weak self] in
             guard let self else { return }
-            let generator = Task {
+            // Detached: these only touch liveSession/prompt/each other, never
+            // engine state, so the actual model call and its timer run off the
+            // main actor instead of serializing through it.
+            let generator = Task.detached {
                 try await liveSession.respond(to: prompt).content
             }
-            let watchdog = Task {
-                try await Task.sleep(nanoseconds: UInt64(self.timeout * 1_000_000_000))
+            let watchdog = Task.detached {
+                try await Task.sleep(nanoseconds: UInt64(watchdogTimeout * 1_000_000_000))
                 generator.cancel()
             }
             // Propagate outer-task cancellation (a superseding request) down into
@@ -123,11 +135,22 @@ final class CompletionEngine {
                 do {
                     let text = try await generator.value
                     watchdog.cancel()
-                    self.consecutiveFailures = 0
+                    // Supersession bumps `generation` before cancelling us; a
+                    // stale success (result arrived just as it was superseded)
+                    // must not reset the failure streak for the live generation.
+                    if token == self.generation {
+                        self.consecutiveFailures = 0
+                    }
                     self.deliver(self.sanitize(text), token: token, onResult: onResult)
                 } catch {
                     watchdog.cancel()
-                    guard !(error is CancellationError) else { return }
+                    // Both supersession and a watchdog timeout cancel `generator`
+                    // and surface here as CancellationError, so the error type
+                    // alone can't tell them apart. Only supersession cancels
+                    // `inFlight` (the ambient task this closure runs as part of);
+                    // the watchdog only ever cancels `generator`. A real timeout
+                    // must still count as a failure and degrade like any other.
+                    if Task.isCancelled { return }
                     self.recordFailure()
                     self.deliver(nil, token: token, onResult: onResult)
                 }
