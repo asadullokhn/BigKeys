@@ -312,6 +312,11 @@ final class KeyboardViewController: UIInputViewController {
     private var lang: Lang = .en
     private var lastCommit: (action: KeyAction, at: Date)?
 
+    // Haptics are a no-op on iPads (no Taptic Engine) — wired anyway so an
+    // iPhone build gets them for free. The input click is the audible
+    // press feedback and needs no Full Access.
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+
     private let trackingView = TrackingView()
     private var suggestionButtons: [UIButton] = []
     private var globeButton: UIButton?
@@ -962,6 +967,8 @@ final class KeyboardViewController: UIInputViewController {
            Date().timeIntervalSince(last.at) < debounceInterval {
             return
         }
+        UIDevice.current.playInputClick()
+        impactFeedback.impactOccurred()
         lastCommit = (action, Date())
 
         switch action {
@@ -1183,8 +1190,10 @@ final class KeyboardViewController: UIInputViewController {
 
 /// Routes raw touches to the controller so keys commit on lift-off
 /// rather than touch-down.
-private final class TrackingView: UIView {
+private final class TrackingView: UIView, UIInputViewAudioFeedback {
     weak var controller: KeyboardViewController?
+
+    var enableInputClicksWhenVisible: Bool { true }
 
     // Let touches above the keyboard band fall through to the app instead
     // of being swallowed by a transparent, oversized container.
