@@ -55,6 +55,16 @@ final class PinnedFrameTests: XCTestCase {
         XCTAssertFalse(value.contains("Want"), "second tap should clear the text")
     }
 
+    func testManualLevelSurvivesReshow() {
+        let app = launchToBigKeys()
+        app.staticTexts["abc"].tap()
+        XCTAssertTrue(app.staticTexts["q"].waitForExistence(timeout: 3), "letters level did not open")
+        app.staticTexts["⌄"].tap() // dismiss keyboard
+        practiceField(in: app).tap() // same field, same signature
+        XCTAssertTrue(app.staticTexts["q"].waitForExistence(timeout: 5),
+                      "manual level was reset on re-show — intent mapping must not refire for an unchanged field signature")
+    }
+
     // MARK: helpers
 
     private func launchToBigKeys() -> XCUIApplication {

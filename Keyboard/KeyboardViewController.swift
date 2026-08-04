@@ -289,6 +289,7 @@ final class KeyboardViewController: UIInputViewController {
     private var keys: [Key] = []
     private var level: Level = .home
     private var clearArmedAt: Date?
+    private var lastIntentSignature: String?
 
     // Content grid width. Pinned columns sit at 0 and contentColumns+1.
     private var contentColumns: Int { 10 }
@@ -356,7 +357,15 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         heightConstraint?.constant = requestedHeight
-        applyIntentLevel()
+        let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
+        if signature != lastIntentSignature {
+            lastIntentSignature = signature
+            if let restored = consumePendingRestore(matching: signature) {
+                level = restored
+            } else {
+                applyIntentLevel()
+            }
+        }
         buildKeys() // also refreshes the Go label for the new field
     }
 
@@ -482,6 +491,28 @@ final class KeyboardViewController: UIInputViewController {
 
     /// Spec: applied once when the keyboard attaches to a field; never
     /// switches mid-typing. Manual navigation always wins afterwards.
+    ///
+    /// Keyboard extensions have no field-identity API, so `viewWillAppear`
+    /// re-applies this only when the field's keyboardType/returnKeyType
+    /// signature differs from the last one seen (see `lastIntentSignature`).
+    /// A same-signature re-show preserves whatever level the user
+    /// navigated to manually — with one wrinkle: tapping the in-keyboard
+    /// ⌄ key (see `commit(.dismiss)`) can tear down and recreate this
+    /// whole controller instance before the field is retapped, which
+    /// would reset `lastIntentSignature` to nil and silently lose the
+    /// manual navigation an in-memory-only guard was meant to protect.
+    /// `commit(.dismiss)` hands the current signature+level to
+    /// `persistPendingRestore`, a one-shot UserDefaults note that the
+    /// very next `viewWillAppear` — on whatever instance handles it —
+    /// consumes via `consumePendingRestore` and clears immediately,
+    /// whether or not the signature still matches. That single-use
+    /// design is deliberate: it survives exactly the reshow it exists
+    /// for, but can never accumulate into a standing override that
+    /// leaks into an unrelated, later field. Known accepted miss:
+    /// retapping a *different* field that happens to share the exact
+    /// same signature right after a dismiss inherits the dismissed
+    /// field's level instead of getting a fresh mapping — there is no
+    /// way to tell that case apart from a re-show of the same field.
     private func applyIntentLevel() {
         switch textDocumentProxy.keyboardType {
         case .numberPad?, .decimalPad?, .phonePad?:
@@ -495,6 +526,46 @@ final class KeyboardViewController: UIInputViewController {
         case .search?, .google?, .yahoo?: level = .letters
         case .send?: level = .words(chatWordsIndex)
         default: level = .home
+        }
+    }
+
+    /// Called right before `dismissKeyboard()` so the level survives even
+    /// if dismissing tears down this controller instance.
+    private func persistPendingRestore(signature: String, level: Level) {
+        let defaults = UserDefaults.standard
+        defaults.set(signature, forKey: "pendingRestoreSignature")
+        switch level {
+        case .home: defaults.set("home", forKey: "pendingRestoreLevel")
+        case .categories: defaults.set("categories", forKey: "pendingRestoreLevel")
+        case .letters: defaults.set("letters", forKey: "pendingRestoreLevel")
+        case .numbers: defaults.set("numbers", forKey: "pendingRestoreLevel")
+        case .words(let index):
+            defaults.set("words", forKey: "pendingRestoreLevel")
+            defaults.set(index, forKey: "pendingRestoreWordsIndex")
+        }
+    }
+
+    /// Consumes (clears) any pending restore from a prior dismiss,
+    /// returning the level it held only if it was left for exactly this
+    /// field signature. Always clears — a stale note left by a dismiss
+    /// nobody followed up on must not linger to ambush some later,
+    /// unrelated field that happens to share a signature.
+    private func consumePendingRestore(matching signature: String) -> Level? {
+        let defaults = UserDefaults.standard
+        let pendingSignature = defaults.string(forKey: "pendingRestoreSignature")
+        let pendingLevel = defaults.string(forKey: "pendingRestoreLevel")
+        let pendingWordsIndex = defaults.integer(forKey: "pendingRestoreWordsIndex")
+        defaults.removeObject(forKey: "pendingRestoreSignature")
+        defaults.removeObject(forKey: "pendingRestoreLevel")
+        defaults.removeObject(forKey: "pendingRestoreWordsIndex")
+        guard pendingSignature == signature else { return nil }
+        switch pendingLevel {
+        case "home": return .home
+        case "categories": return .categories
+        case "letters": return .letters
+        case "numbers": return .numbers
+        case "words": return .words(pendingWordsIndex)
+        default: return nil
         }
     }
 
@@ -883,6 +954,8 @@ final class KeyboardViewController: UIInputViewController {
             UserDefaults.standard.set(sizeIndex, forKey: "sizeIndex")
             heightConstraint?.constant = requestedHeight
         case .dismiss:
+            let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
+            persistPendingRestore(signature: signature, level: level)
             dismissKeyboard()
         case .language:
             // Same positions, new labels — muscle memory survives the switch.
