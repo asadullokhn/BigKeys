@@ -15,10 +15,10 @@ import XCTest
 //
 // Measurement note: a custom keyboard does NOT surface as a `Keyboard`
 // AX element, so app.keyboards is useless here. Instead we detect
-// BigKeys by its own "Core" tab, and measure the keyboard's effective
-// size by where the focused text field sits — a ballooning keyboard
-// window pushes the field toward the top of the screen, which is
-// exactly the user-visible symptom.
+// BigKeys by its own "Home" pinned key, and measure the keyboard's
+// effective size by where the focused text field sits — a ballooning
+// keyboard window pushes the field toward the top of the screen, which
+// is exactly the user-visible symptom.
 final class KeyboardHeightTests: XCTestCase {
 
     private let tolerance: CGFloat = 60
@@ -53,7 +53,7 @@ final class KeyboardHeightTests: XCTestCase {
             XCUIDevice.shared.press(.home)
             Thread.sleep(forTimeInterval: 1)
             app.activate()
-            if !app.staticTexts["Core"].waitForExistence(timeout: 3) {
+            if !app.staticTexts["Home"].waitForExistence(timeout: 3) {
                 practiceField(in: app).tap()
             }
             ensureBigKeysActive(app)
@@ -68,7 +68,7 @@ final class KeyboardHeightTests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1.5)
         snapshot(name: "landscape")
-        XCTAssertTrue(app.staticTexts["Core"].exists, "BigKeys lost after rotation")
+        XCTAssertTrue(app.staticTexts["Home"].exists, "BigKeys lost after rotation")
 
         XCUIDevice.shared.orientation = .portrait
         Thread.sleep(forTimeInterval: 1.5)
@@ -81,7 +81,7 @@ final class KeyboardHeightTests: XCTestCase {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 1)
         app.activate()
-        if !app.staticTexts["Core"].waitForExistence(timeout: 3) {
+        if !app.staticTexts["Home"].waitForExistence(timeout: 3) {
             practiceField(in: app).tap()
         }
         ensureBigKeysActive(app)
@@ -101,7 +101,7 @@ final class KeyboardHeightTests: XCTestCase {
     /// the system keyboard.
     private func ensureBigKeysActive(_ app: XCUIApplication) {
         for _ in 0..<6 {
-            if app.staticTexts["Core"].waitForExistence(timeout: 2) { return }
+            if app.staticTexts["Home"].waitForExistence(timeout: 2) { return }
             let globe = app.buttons["Next keyboard"].exists
                 ? app.buttons["Next keyboard"]
                 : app.buttons.matching(
@@ -109,7 +109,7 @@ final class KeyboardHeightTests: XCTestCase {
             guard globe.exists else { break }
             globe.tap()
         }
-        XCTAssertTrue(app.staticTexts["Core"].exists,
+        XCTAssertTrue(app.staticTexts["Home"].exists,
                       "BigKeys is not the active keyboard — the test would be measuring the system keyboard")
     }
 
