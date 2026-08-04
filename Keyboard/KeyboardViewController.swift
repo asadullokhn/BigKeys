@@ -291,8 +291,16 @@ final class KeyboardViewController: UIInputViewController {
     private var clearArmedAt: Date?
     private var lastIntentSignature: String?
 
-    // Content grid width. Pinned columns sit at 0 and contentColumns+1.
-    private var contentColumns: Int { 10 }
+    // Compact (floating / Split View / Slide Over): word boards drop to 5
+    // wide-enough columns showing the first 20 content cells; the typing
+    // levels keep all 10 columns — a letter that isn't there at all is
+    // worse than a narrower key. Pinned columns never move.
+    private var contentColumns: Int {
+        switch level {
+        case .letters, .numbers: return 10
+        default: return isCompact ? 5 : 10
+        }
+    }
 
     private var isWordLevel: Bool {
         switch level {
@@ -654,16 +662,25 @@ final class KeyboardViewController: UIInputViewController {
             cells += homeWords.map { Optional(wordCell($0)) }
             return chunk(cells, into: cols)
         case .categories:
-            // Big targets suit the AAC use case: tile the full content
-            // area as 5x2 slots, each slot a 2x2 block of grid cells.
-            // 9 categories fill 9 of the 10 slots; the last 2x2 region
-            // stays empty (nearest-key gives it to an adjacent category).
-            var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
-            for (i, category) in allCategories().prefix(9).enumerated() {
-                let slotRow = i / 5, slotCol = i % 5
-                rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
+            if cols >= 10 {
+                // Big targets suit the AAC use case: tile the full content
+                // area as 5x2 slots, each slot a 2x2 block of grid cells.
+                // 9 categories fill 9 of the 10 slots; the last 2x2 region
+                // stays empty (nearest-key gives it to an adjacent category).
+                var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
+                for (i, category) in allCategories().prefix(9).enumerated() {
+                    let slotRow = i / 5, slotCol = i % 5
+                    rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
+                }
+                return rows
+            } else {
+                // Compact: plain single cells, chunked like word boards.
+                let categories = allCategories()
+                let cells: [ContentCell?] = categories.prefix(9).enumerated().map { (i, category) in
+                    ContentCell(.toWords(i), category.name)
+                }
+                return chunk(cells, into: cols)
             }
-            return rows
         case .words(let index):
             let categories = allCategories()
             let words = index < categories.count ? categories[index].words : []
