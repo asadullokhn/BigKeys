@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		4F2971AAB04CB45F9F3A0D2B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */; };
 		591312BBAA426D1DE2ABB2BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 238704140C8DFC7E10D738C7 /* Assets.xcassets */; };
+		9C862CD8CF1738B5038563A8 /* MyWordsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 167A2498198387A80DD85FC1 /* MyWordsTests.swift */; };
 		B9274BDBCA7F7A765DA6CCD7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */; };
 		BD72207B7019C86BCF8699CE /* CompletionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */; };
 		C5DE9CF6E675B6572A25B3F0 /* KeyboardHeightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D977763A87F89006584A3902 /* KeyboardHeightTests.swift */; };
@@ -50,6 +51,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		167A2498198387A80DD85FC1 /* MyWordsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyWordsTests.swift; sourceTree = "<group>"; };
 		238704140C8DFC7E10D738C7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2F4B7442BDF523BAC5B0E4C2 /* PinnedFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedFrameTests.swift; sourceTree = "<group>"; };
 		540443137A743CBC5FFF53C0 /* Typikey.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Typikey.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -104,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				D977763A87F89006584A3902 /* KeyboardHeightTests.swift */,
+				167A2498198387A80DD85FC1 /* MyWordsTests.swift */,
 				2F4B7442BDF523BAC5B0E4C2 /* PinnedFrameTests.swift */,
 			);
 			path = UITests;
@@ -268,6 +271,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C5DE9CF6E675B6572A25B3F0 /* KeyboardHeightTests.swift in Sources */,
+				9C862CD8CF1738B5038563A8 /* MyWordsTests.swift in Sources */,
 				FB44BAC1AC5A3F6C433CD88D /* PinnedFrameTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
