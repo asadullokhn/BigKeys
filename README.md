@@ -1,6 +1,6 @@
-# BigKeys
+# Typikey
 
-A TouchChat-style iPadOS keyboard extension for people with limited fine motor control. Built by Ali, Artem, and Keiko for Apple Developer Academy Challenge 5, inspired by our community: The Inclusive Pair (Muhammad Sayfullah and Siti Fadillah, Singapore-based AAC advocates).
+(Repo codename: BigKeys.) A TouchChat-style iPadOS keyboard extension for people with limited fine motor control. Built by Ali, Artem, and Keiko for Apple Developer Academy Challenge 5, inspired by our community: The Inclusive Pair (Muhammad Sayfullah and Siti Fadillah, Singapore-based AAC advocates).
 
 ## The problem
 
@@ -48,29 +48,29 @@ Every interaction decision traces to a specific research finding:
 ## Project structure
 
 ```
-BigKeys/
+Typikey/
   project.yml                      xcodegen spec — the source of truth for the project
-  App/BigKeysApp.swift             container app: setup instructions + practice text field
+  App/TypikeyApp.swift             container app: setup instructions + practice text field
   Keyboard/KeyboardViewController.swift   the entire keyboard extension
-  BigKeys.xcodeproj                generated — regenerate with `xcodegen generate`
+  Typikey.xcodeproj                generated — regenerate with `xcodegen generate`
 ```
 
 ## Build and run
 
 Requirements: Xcode 26+, an iPad (or simulator), and a signing team.
 
-1. Clone, then open `BigKeys.xcodeproj` (or run `xcodegen generate` first if you've changed `project.yml` — `brew install xcodegen` if needed).
+1. Clone, then open `Typikey.xcodeproj` (or run `xcodegen generate` first if you've changed `project.yml` — `brew install xcodegen` if needed).
 2. **Change `DEVELOPMENT_TEAM` in `project.yml` to your own team ID** (currently Ali's), regenerate, or just set your team in Xcode's Signing & Capabilities for both targets.
-3. Build and run the `BigKeys` scheme on your device.
-4. On the iPad: Settings → General → Keyboard → Keyboards → Add New Keyboard → BigKeys.
-5. Open any app with a text field (or the BigKeys app's practice field), hold the globe key, choose BigKeys.
+3. Build and run the `Typikey` scheme on your device.
+4. On the iPad: Settings → General → Keyboard → Keyboards → Add New Keyboard → Typikey.
+5. Open any app with a text field (or the Typikey app's practice field), hold the globe key, choose Typikey.
 
 First run on a new device needs Developer Mode enabled (Settings → Privacy & Security → Developer Mode) and the device registered to your team — Xcode handles that automatically on first install.
 
 ## Testing
 
 - Manual: build to a device, enable the keyboard, and use the practice field in the app. The regression checklist that matters: open/close/reopen the keyboard several times, rotate both ways, and confirm the height never grows (this was a real bug — see the git history on `fix/rotation-height`).
-- Automated: `UITests/KeyboardHeightTests.swift` contains a scripted version of that exact checklist with height assertions. It is currently prefixed `todo_` (skipped) because reliably making a third-party keyboard the *active* keyboard inside a simulator is unsolved — the file documents what was tried. Run it by renaming the method to `test...` and running the BigKeys scheme's tests against a **freshly erased** simulator.
+- Automated: `UITests/KeyboardHeightTests.swift` contains a scripted version of that exact checklist with height assertions. It is currently prefixed `todo_` (skipped) because reliably making a third-party keyboard the *active* keyboard inside a simulator is unsolved — the file documents what was tried. Run it by renaming the method to `test...` and running the Typikey scheme's tests against a **freshly erased** simulator.
 
 ## Known limitations / not yet decided
 

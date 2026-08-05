@@ -6,16 +6,16 @@ import XCTest
 // cycle (open, close, reopen, rotate) and asserts the keyboard's
 // app-visible size stays put.
 //
-// PRECONDITION: BigKeys must already be enabled on the simulator
+// PRECONDITION: Typikey must already be enabled on the simulator
 // (Settings → General → Keyboard → Keyboards → Add New Keyboard).
 // Automating that enablement proved unreliable — the AppleKeyboards
 // defaults write is ignored by the live input system, and Settings-app
 // navigation differs on iPadOS 26 (attempts preserved in
-// enableBigKeysViaSettings, currently unused).
+// enableTypikeyViaSettings, currently unused).
 //
 // Measurement note: a custom keyboard does NOT surface as a `Keyboard`
 // AX element, so app.keyboards is useless here. Instead we detect
-// BigKeys by its own "Home" pinned key, and measure the keyboard's
+// Typikey by its own "Home" pinned key, and measure the keyboard's
 // effective size by where the focused text field sits — a ballooning
 // keyboard window pushes the field toward the top of the screen, which
 // is exactly the user-visible symptom.
@@ -40,7 +40,7 @@ final class KeyboardHeightTests: XCTestCase {
             field.tap()
         }
 
-        ensureBigKeysActive(app)
+        ensureTypikeyActive(app)
         let screenHeight = XCUIScreen.main.screenshot().image.size.height
 
         let baseline = practiceField(in: app).frame.maxY
@@ -56,7 +56,7 @@ final class KeyboardHeightTests: XCTestCase {
             if !app.staticTexts["Home"].waitForExistence(timeout: 3) {
                 practiceField(in: app).tap()
             }
-            ensureBigKeysActive(app)
+            ensureTypikeyActive(app)
             let position = practiceField(in: app).frame.maxY
             snapshot(name: "cycle-\(cycle)")
             XCTAssertEqual(position, baseline, accuracy: tolerance,
@@ -68,7 +68,7 @@ final class KeyboardHeightTests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1.5)
         snapshot(name: "landscape")
-        XCTAssertTrue(app.staticTexts["Home"].exists, "BigKeys lost after rotation")
+        XCTAssertTrue(app.staticTexts["Home"].exists, "Typikey lost after rotation")
 
         XCUIDevice.shared.orientation = .portrait
         Thread.sleep(forTimeInterval: 1.5)
@@ -84,7 +84,7 @@ final class KeyboardHeightTests: XCTestCase {
         if !app.staticTexts["Home"].waitForExistence(timeout: 3) {
             practiceField(in: app).tap()
         }
-        ensureBigKeysActive(app)
+        ensureTypikeyActive(app)
         let final = practiceField(in: app).frame.maxY
         snapshot(name: "final")
         XCTAssertEqual(final, baseline, accuracy: tolerance,
@@ -99,7 +99,7 @@ final class KeyboardHeightTests: XCTestCase {
     /// Cycle the globe key until our grid shows up, and hard-fail if it
     /// never does. Without this the test can pass while silently measuring
     /// the system keyboard.
-    private func ensureBigKeysActive(_ app: XCUIApplication) {
+    private func ensureTypikeyActive(_ app: XCUIApplication) {
         for _ in 0..<6 {
             if app.staticTexts["Home"].waitForExistence(timeout: 2) { return }
             let globe = app.buttons["Next keyboard"].exists
@@ -110,12 +110,12 @@ final class KeyboardHeightTests: XCTestCase {
             globe.tap()
         }
         XCTAssertTrue(app.staticTexts["Home"].exists,
-                      "BigKeys is not the active keyboard — the test would be measuring the system keyboard")
+                      "Typikey is not the active keyboard — the test would be measuring the system keyboard")
     }
 
     /// Unused: preserved documentation of the enablement-automation
     /// attempts. See the header comment for why this is manual for now.
-    private func enableBigKeysViaSettings() {
+    private func enableTypikeyViaSettings() {
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         settings.launch()
         let general = settings.staticTexts["General"].firstMatch
@@ -127,7 +127,7 @@ final class KeyboardHeightTests: XCTestCase {
         let keyboardsRow = settings.staticTexts["Keyboards"].firstMatch
         guard keyboardsRow.waitForExistence(timeout: 5) else { return }
         keyboardsRow.tap()
-        if settings.staticTexts["BigKeys"].waitForExistence(timeout: 2) {
+        if settings.staticTexts["Typikey"].waitForExistence(timeout: 2) {
             settings.terminate()
             return
         }
@@ -135,7 +135,7 @@ final class KeyboardHeightTests: XCTestCase {
             NSPredicate(format: "label BEGINSWITH 'Add New Keyboard'")).firstMatch
         guard addNew.waitForExistence(timeout: 5) else { return }
         addNew.tap()
-        let bigKeys = settings.staticTexts["BigKeys"].firstMatch
+        let bigKeys = settings.staticTexts["Typikey"].firstMatch
         if bigKeys.waitForExistence(timeout: 5) {
             bigKeys.tap()
         }

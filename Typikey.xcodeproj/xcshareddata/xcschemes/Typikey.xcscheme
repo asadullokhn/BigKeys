@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "442C647F7B7C6EB2AA0C9C1B"
-               BuildableName = "BigKeys.app"
-               BlueprintName = "BigKeys"
-               ReferencedContainer = "container:BigKeys.xcodeproj">
+               BlueprintIdentifier = "A2467DEA23AE29F71CEEEA5D"
+               BuildableName = "Typikey.app"
+               BlueprintName = "Typikey"
+               ReferencedContainer = "container:Typikey.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -29,10 +29,10 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "52D2EE61B018FE467A4B78D8"
-               BuildableName = "BigKeysUITests.xctest"
-               BlueprintName = "BigKeysUITests"
-               ReferencedContainer = "container:BigKeys.xcodeproj">
+               BlueprintIdentifier = "00E59903FECC2CA8D9F86ED3"
+               BuildableName = "TypikeyUITests.xctest"
+               BlueprintName = "TypikeyUITests"
+               ReferencedContainer = "container:Typikey.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,10 +46,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "442C647F7B7C6EB2AA0C9C1B"
-            BuildableName = "BigKeys.app"
-            BlueprintName = "BigKeys"
-            ReferencedContainer = "container:BigKeys.xcodeproj">
+            BlueprintIdentifier = "A2467DEA23AE29F71CEEEA5D"
+            BuildableName = "Typikey.app"
+            BlueprintName = "Typikey"
+            ReferencedContainer = "container:Typikey.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -58,10 +58,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "52D2EE61B018FE467A4B78D8"
-               BuildableName = "BigKeysUITests.xctest"
-               BlueprintName = "BigKeysUITests"
-               ReferencedContainer = "container:BigKeys.xcodeproj">
+               BlueprintIdentifier = "00E59903FECC2CA8D9F86ED3"
+               BuildableName = "TypikeyUITests.xctest"
+               BlueprintName = "TypikeyUITests"
+               ReferencedContainer = "container:Typikey.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -82,10 +82,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "442C647F7B7C6EB2AA0C9C1B"
-            BuildableName = "BigKeys.app"
-            BlueprintName = "BigKeys"
-            ReferencedContainer = "container:BigKeys.xcodeproj">
+            BlueprintIdentifier = "A2467DEA23AE29F71CEEEA5D"
+            BuildableName = "Typikey.app"
+            BlueprintName = "Typikey"
+            ReferencedContainer = "container:Typikey.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -99,10 +99,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "442C647F7B7C6EB2AA0C9C1B"
-            BuildableName = "BigKeys.app"
-            BlueprintName = "BigKeys"
-            ReferencedContainer = "container:BigKeys.xcodeproj">
+            BlueprintIdentifier = "A2467DEA23AE29F71CEEEA5D"
+            BuildableName = "Typikey.app"
+            BlueprintName = "Typikey"
+            ReferencedContainer = "container:Typikey.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -2,7 +2,7 @@
 
 ## What this project is
 
-BigKeys is a TouchChat-style iPadOS keyboard extension for a specific real person: an AAC user with spastic quadriplegic cerebral palsy whose bottleneck is spatial precision (up to 30 seconds per tap on a standard keyboard), not vocabulary or thinking speed. Read `README.md` before changing anything — every design decision traces to community research, and the reasoning matters more than the code.
+Typikey is a TouchChat-style iPadOS keyboard extension for a specific real person: an AAC user with spastic quadriplegic cerebral palsy whose bottleneck is spatial precision (up to 30 seconds per tap on a standard keyboard), not vocabulary or thinking speed. Read `README.md` before changing anything — every design decision traces to community research, and the reasoning matters more than the code.
 
 ## Git rules
 

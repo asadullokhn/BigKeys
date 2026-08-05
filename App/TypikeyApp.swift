@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct BigKeysApp: App {
+struct TypikeyApp: App {
     var body: some Scene {
         WindowGroup {
             SetupView()
@@ -16,12 +16,12 @@ struct SetupView: View {
         NavigationStack {
             List {
                 Section {
-                    Label("BigKeys is a keyboard with large targets, built for people with limited fine motor control.", systemImage: "keyboard")
+                    Label("Typikey is a keyboard with large targets, built for people with limited fine motor control.", systemImage: "keyboard")
                         .font(.title3)
                         .padding(.vertical, 8)
                 }
                 Section("Try it here") {
-                    TextField("Tap here, hold the globe key, choose BigKeys", text: $practiceText, axis: .vertical)
+                    TextField("Tap here, hold the globe key, choose Typikey", text: $practiceText, axis: .vertical)
                         .font(.title2)
                         .lineLimit(3...6)
                 }
@@ -29,12 +29,12 @@ struct SetupView: View {
                     step(1, "Open Settings")
                     step(2, "General → Keyboard → Keyboards")
                     step(3, "Add New Keyboard…")
-                    step(4, "Select BigKeys")
+                    step(4, "Select Typikey")
                 }
                 Section("Use it") {
                     step(1, "Open any app with a text field (Notes, Messages)")
                     step(2, "Tap the text field, then hold the globe key")
-                    step(3, "Select BigKeys")
+                    step(3, "Select Typikey")
                 }
                 Section("How it types") {
                     Label("A word grid, like TouchChat: one tap inserts one whole word. Categories switch pages at the top.", systemImage: "square.grid.3x3")
@@ -43,7 +43,7 @@ struct SetupView: View {
                     Label("Accidental double-taps are ignored for half a second.", systemImage: "clock")
                 }
             }
-            .navigationTitle("BigKeys")
+            .navigationTitle("Typikey")
         }
     }
 
