@@ -546,6 +546,12 @@ final class KeyboardViewController: UIInputViewController {
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
+        // An external context refresh (e.g. first responder moving to a
+        // different field without this instance's viewWillAppear firing)
+        // can bridge a half-typed token across fields. Reset rather than
+        // count — the same reset-don't-count policy as every other
+        // ambiguous path below.
+        typedToken = ""
         updateSuggestions()
         requestPhraseCompletion()
     }
@@ -756,7 +762,9 @@ final class KeyboardViewController: UIInputViewController {
                 // 10 categories (Recents + 8 vocabulary + Mine) exactly
                 // fill all 10 slots.
                 var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
-                for (i, category) in allCategories().enumerated() {
+                // Bounded at 10: the 5x2 tiling holds exactly 10 slots —
+                // an 11th category would index past rows' 4 rows and crash.
+                for (i, category) in allCategories().prefix(10).enumerated() {
                     let slotRow = i / 5, slotCol = i % 5
                     rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
                 }
@@ -1136,11 +1144,14 @@ final class KeyboardViewController: UIInputViewController {
             completionWords = []
             level = .numbers; buildKeys()
         case .clearAll:
+            typedToken = ""
             completionWords = []
             handleClearAll()
         case .cursorLeft:
+            typedToken = ""
             textDocumentProxy.adjustTextPosition(byCharacterOffset: -1)
         case .cursorRight:
+            typedToken = ""
             textDocumentProxy.adjustTextPosition(byCharacterOffset: 1)
         case .space:
             terminateToken()
@@ -1279,6 +1290,13 @@ final class KeyboardViewController: UIInputViewController {
         let token = typedToken
         typedToken = ""
         guard token.count >= 3, token.allSatisfy(\.isLetter), !isKnownWord(token) else { return }
+        // Structured fields (email/URL/search) yield fragments like
+        // "gmail" or "com" that are never real vocabulary — skip counting,
+        // typing still works normally either way.
+        switch textDocumentProxy.keyboardType {
+        case .emailAddress?, .URL?, .webSearch?: return
+        default: break
+        }
         var counts = (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
         counts[token, default: 0] += 1
         store.set(counts, forKey: "captureCounts")
@@ -1311,10 +1329,13 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func topVocabulary() -> [String] {
+        // myWords go first and are never starved by usage ranking — the
+        // user's own words matter for completion regardless of how often
+        // built-in vocabulary has been used.
         let ranked = usageCounts.sorted { $0.value > $1.value }.map(\.key)
         var seen = Set<String>()
         var result: [String] = []
-        for word in ranked + myWords {
+        for word in myWords + ranked {
             guard !seen.contains(word) else { continue }
             seen.insert(word)
             result.append(word)
@@ -1405,6 +1426,11 @@ final class KeyboardViewController: UIInputViewController {
         if isWordLevel {
             insertWord(title)
         } else {
+            // The chip replaces whatever was typed so far with a full
+            // suggestion — typedToken no longer matches what's on screen.
+            // Reset rather than count: the completed word wasn't typed
+            // letter-by-letter, so it isn't a capture candidate.
+            typedToken = ""
             let word = currentPartialWord()
             for _ in 0..<word.count { textDocumentProxy.deleteBackward() }
             textDocumentProxy.insertText(title + " ")
