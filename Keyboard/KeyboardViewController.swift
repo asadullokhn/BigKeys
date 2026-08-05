@@ -330,6 +330,22 @@ final class KeyboardViewController: UIInputViewController {
     private var usageCounts: [String: Int] = [:]
     private var learnedBigrams: [String: Int] = [:]
 
+    // The user's own words (Task G1 capture). Loaded in viewDidLoad and
+    // reloaded in viewWillAppear so app-side edits in My Words appear the
+    // next time the keyboard shows.
+    private var myWords: [String] = []
+
+    // Accumulates the current letters-level word as it's typed one key at
+    // a time; cleared on any terminator (space/return/punctuation/delete/
+    // level change/field switch) so only real letter-by-letter typing is
+    // ever counted — grid-cell word taps never touch this.
+    private var typedToken = ""
+
+    /// Built-in vocabulary text, lowercased, for a case-insensitive
+    /// "already known" check when deciding whether a typed token is a
+    /// capture candidate.
+    private static let knownVocabWords: Set<String> = Set(vocabIndex.keys.map { $0.lowercased() })
+
     /// Persistence home. With Full Access granted, learning and settings
     /// live in the app group so the container app can read and (later)
     /// edit them; without it, everything stays in the extension's own
@@ -368,6 +384,7 @@ final class KeyboardViewController: UIInputViewController {
 
         usageCounts = (store.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
         learnedBigrams = (store.dictionary(forKey: "bigrams") as? [String: Int]) ?? [:]
+        myWords = (store.array(forKey: "myWords") as? [String]) ?? []
         if let saved = store.string(forKey: "lang"), let restored = Lang(rawValue: saved) {
             lang = restored
         }
@@ -402,6 +419,11 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // Reload before buildKeys() below so app-side My Words edits and a
+        // fresh field both show up on this appearance, and so a stale
+        // in-progress token from a previous field never leaks into a new one.
+        myWords = (store.array(forKey: "myWords") as? [String]) ?? []
+        typedToken = ""
         heightConstraint?.constant = requestedHeight
         let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
         // Unconditional and unconditionally FIRST: reads and clears any
@@ -526,7 +548,11 @@ final class KeyboardViewController: UIInputViewController {
             if unique.count == 12 { break }
         }
         let recentsName = lang == .ms ? "Terkini" : "Recents"
-        return [(recentsName, unique)] + vocabulary.map { ($0.name(lang), $0.words) }
+        // Mine appends after the built-in categories — never reorders them
+        // (invariant 1). Plain-text cells built on the fly; myWords are
+        // never added to vocabIndex (that stays the built-in lookup only).
+        let mineWords = myWords.map { VocabWord($0, .social) }
+        return [(recentsName, unique)] + vocabulary.map { ($0.name(lang), $0.words) } + [("Mine", mineWords)]
     }
 
     // MARK: Frame (spec: pinned columns identical on every level)
@@ -710,10 +736,10 @@ final class KeyboardViewController: UIInputViewController {
             if cols >= 10 {
                 // Big targets suit the AAC use case: tile the full content
                 // area as 5x2 slots, each slot a 2x2 block of grid cells.
-                // 9 categories fill 9 of the 10 slots; the last 2x2 region
-                // stays empty (nearest-key gives it to an adjacent category).
+                // 10 categories (Recents + 8 vocabulary + Mine) exactly
+                // fill all 10 slots.
                 var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
-                for (i, category) in allCategories().prefix(9).enumerated() {
+                for (i, category) in allCategories().enumerated() {
                     let slotRow = i / 5, slotCol = i % 5
                     rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
                 }
@@ -721,7 +747,7 @@ final class KeyboardViewController: UIInputViewController {
             } else {
                 // Compact: plain single cells, chunked like word boards.
                 let categories = allCategories()
-                let cells: [ContentCell?] = categories.prefix(9).enumerated().map { (i, category) in
+                let cells: [ContentCell?] = categories.enumerated().map { (i, category) in
                     ContentCell(.toWords(i), category.name)
                 }
                 return chunk(cells, into: cols)
@@ -730,9 +756,15 @@ final class KeyboardViewController: UIInputViewController {
             let categories = allCategories()
             let words = index < categories.count ? categories[index].words : []
             if words.isEmpty {
-                let hint = lang == .ms
-                    ? "Perkataan yang kerap digunakan akan muncul di sini"
-                    : "Words you use often will appear here"
+                // Mine's empty state isn't Recents' "used often" story —
+                // same English hint in both languages (invariant 8: no new
+                // Malay strings).
+                let isMine = index < categories.count && categories[index].name == "Mine"
+                let hint = isMine
+                    ? "Add words in the Typikey app"
+                    : (lang == .ms
+                        ? "Perkataan yang kerap digunakan akan muncul di sini"
+                        : "Words you use often will appear here")
                 var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
                 rows[0][0] = ContentCell(.toWords(1), hint, colSpan: cols)
                 return rows
@@ -1045,30 +1077,45 @@ final class KeyboardViewController: UIInputViewController {
         case .word(let w):
             insertWord(w)
         case .punct(let p):
+            terminateToken()
             insertPunctuation(p)
         case .char(let c):
+            if let ch = c.first, c.count == 1, ch.isLetter {
+                typedToken += c.lowercased()
+            } else {
+                terminateToken()
+            }
             textDocumentProxy.insertText(shifted ? c.uppercased() : c)
             if shifted { shifted = false; restyleAll() }
         case .shift:
             shifted.toggle()
             restyleAll()
         case .delete:
+            // Deleting mid-word makes the accumulated token unreliable —
+            // reset rather than count a partial/garbled word.
+            typedToken = ""
             textDocumentProxy.deleteBackward()
         case .deleteWord:
+            typedToken = ""
             deleteLastWord()
         case .home:
+            typedToken = ""
             completionWords = []
             level = .home; buildKeys()
         case .toCategories:
+            typedToken = ""
             completionWords = []
             level = .categories; buildKeys()
         case .toWords(let i):
+            typedToken = ""
             completionWords = []
             level = .words(i); buildKeys()
         case .toLetters:
+            typedToken = ""
             completionWords = []
             level = .letters; buildKeys()
         case .toNumbers:
+            typedToken = ""
             completionWords = []
             level = .numbers; buildKeys()
         case .clearAll:
@@ -1079,8 +1126,10 @@ final class KeyboardViewController: UIInputViewController {
         case .cursorRight:
             textDocumentProxy.adjustTextPosition(byCharacterOffset: 1)
         case .space:
+            terminateToken()
             textDocumentProxy.insertText(" ")
         case .ret:
+            terminateToken()
             textDocumentProxy.insertText("\n")
         case .size:
             sizeIndex = (sizeIndex + 1) % sizePresets.count
@@ -1203,6 +1252,28 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
+    // MARK: Capture (Task G1 — letters-level typing, not grid-cell taps)
+
+    /// Ends the current typed token — called on a terminator (space,
+    /// return, grid punctuation, or a non-letter char). Counts it as a
+    /// capture candidate when it's ≥3 letters and not already known;
+    /// always clears the accumulator either way.
+    private func terminateToken() {
+        let token = typedToken
+        typedToken = ""
+        guard token.count >= 3, token.allSatisfy(\.isLetter), !isKnownWord(token) else { return }
+        var counts = (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
+        counts[token, default: 0] += 1
+        store.set(counts, forKey: "captureCounts")
+    }
+
+    /// Case-insensitive check against myWords and the built-in vocabulary
+    /// — `token` is already lowercased by the time it reaches here.
+    private func isKnownWord(_ token: String) -> Bool {
+        if myWords.contains(where: { $0.lowercased() == token }) { return true }
+        return Self.knownVocabWords.contains(token)
+    }
+
     // MARK: Prediction (on-device only — no Full Access, no network)
 
     /// Grid mode: predict likely next words from learned bigrams, seeded
@@ -1223,7 +1294,16 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func topVocabulary() -> [String] {
-        usageCounts.sorted { $0.value > $1.value }.prefix(40).map(\.key)
+        let ranked = usageCounts.sorted { $0.value > $1.value }.map(\.key)
+        var seen = Set<String>()
+        var result: [String] = []
+        for word in ranked + myWords {
+            guard !seen.contains(word) else { continue }
+            seen.insert(word)
+            result.append(word)
+            if result.count == 40 { break }
+        }
+        return result
     }
 
     private func requestPhraseCompletion() {
