@@ -30,11 +30,10 @@ targets:
           - UIInterfaceOrientationLandscapeRight
     settings:
       base:
-        # Bundle ids predate the Typikey rename and stay put on purpose:
-        # the keyboard's enabled state on every device is keyed to them,
-        # and users never see them. The App Store Connect record binds to
-        # this id.
-        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys
+        # Renamed together with the product (2026-08-05, pre-release —
+        # the last moment this is cheap): the App Store record fixes the
+        # bundle id forever, so it should carry the real name.
+        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
@@ -48,7 +47,7 @@ targets:
       - target: Typikey
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey.uitests
         TEST_TARGET_NAME: Typikey
   TypikeyKeyboard:
     type: app-extension
@@ -69,7 +68,7 @@ targets:
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.bigkeys.keyboard
+        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey.keyboard
 schemes:
   Typikey:
     build:
