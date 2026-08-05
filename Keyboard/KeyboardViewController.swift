@@ -330,6 +330,29 @@ final class KeyboardViewController: UIInputViewController {
     private var usageCounts: [String: Int] = [:]
     private var learnedBigrams: [String: Int] = [:]
 
+    /// Persistence home. With Full Access granted, learning and settings
+    /// live in the app group so the container app can read and (later)
+    /// edit them; without it, everything stays in the extension's own
+    /// sandbox exactly as before — the keyboard never REQUIRES the grant.
+    private lazy var store: UserDefaults = {
+        guard hasFullAccess,
+              let shared = UserDefaults(suiteName: "group.com.asadullokh.ch5.typikey") else {
+            return .standard
+        }
+        // One-time migration: adopt the sandbox learning the first time
+        // the shared container becomes reachable, never overwriting data
+        // that is already there.
+        if shared.object(forKey: "usage") == nil,
+           UserDefaults.standard.object(forKey: "usage") != nil {
+            for key in ["usage", "bigrams", "lang", "sizeIndex"] {
+                if let value = UserDefaults.standard.object(forKey: key) {
+                    shared.set(value, forKey: key)
+                }
+            }
+        }
+        return shared
+    }()
+
     // Phrase completion (spec 2026-08-04). completionWords is the current
     // continuation; empty means none. Requests are issued only from the
     // trigger points (commit / textDidChange), never from inside
@@ -343,13 +366,13 @@ final class KeyboardViewController: UIInputViewController {
         super.viewDidLoad()
         view.backgroundColor = .clear
 
-        usageCounts = (UserDefaults.standard.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
-        learnedBigrams = (UserDefaults.standard.dictionary(forKey: "bigrams") as? [String: Int]) ?? [:]
-        if let saved = UserDefaults.standard.string(forKey: "lang"), let restored = Lang(rawValue: saved) {
+        usageCounts = (store.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
+        learnedBigrams = (store.dictionary(forKey: "bigrams") as? [String: Int]) ?? [:]
+        if let saved = store.string(forKey: "lang"), let restored = Lang(rawValue: saved) {
             lang = restored
         }
-        if UserDefaults.standard.object(forKey: "sizeIndex") != nil {
-            sizeIndex = min(max(UserDefaults.standard.integer(forKey: "sizeIndex"), 0), sizePresets.count - 1)
+        if store.object(forKey: "sizeIndex") != nil {
+            sizeIndex = min(max(store.integer(forKey: "sizeIndex"), 0), sizePresets.count - 1)
         }
 
         // Height lives on OUR content view, never on the root view. The
@@ -1061,7 +1084,7 @@ final class KeyboardViewController: UIInputViewController {
             textDocumentProxy.insertText("\n")
         case .size:
             sizeIndex = (sizeIndex + 1) % sizePresets.count
-            UserDefaults.standard.set(sizeIndex, forKey: "sizeIndex")
+            store.set(sizeIndex, forKey: "sizeIndex")
             heightConstraint?.constant = requestedHeight
         case .dismiss:
             let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
@@ -1071,7 +1094,7 @@ final class KeyboardViewController: UIInputViewController {
             completionWords = []
             // Same positions, new labels — muscle memory survives the switch.
             lang = lang == .en ? .ms : .en
-            UserDefaults.standard.set(lang.rawValue, forKey: "lang")
+            store.set(lang.rawValue, forKey: "lang")
             buildKeys()
         }
         updateSuggestions()
@@ -1152,10 +1175,10 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.insertText(text + " ")
 
         usageCounts[word, default: 0] += 1
-        UserDefaults.standard.set(usageCounts, forKey: "usage")
+        store.set(usageCounts, forKey: "usage")
         if !previous.isEmpty {
             learnedBigrams["\(previous.lowercased())|\(word)", default: 0] += 1
-            UserDefaults.standard.set(learnedBigrams, forKey: "bigrams")
+            store.set(learnedBigrams, forKey: "bigrams")
         }
     }
 
