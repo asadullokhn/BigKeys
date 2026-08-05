@@ -24,12 +24,13 @@ The full list with reasoning lives in `CONTRIBUTING.md`. The short version:
 
 1. Grid cell positions never move or reorder (muscle memory). New words go at the end.
 2. Touch-down never types. Lift-off commits. Sliding is free exploration.
-3. Same-key commits within 0.5s are ignored (deletes exempt).
+3. Same-key commits within 0.5s are ignored (delete, word-delete, clear-all, and the cursor arrows are exempt).
 4. Every point on the keyboard maps to the nearest key — no dead zones.
 5. `RequestsOpenAccess` stays `false`. No network calls, no shared containers, no Full Access — this is a deliberate product decision, not an oversight.
 6. Prediction appears only in the suggestion bar, never by reordering the grid.
 7. Language switching relabels cells in place.
 8. Malay vocabulary is an unverified draft — flag any translation you add as unverified.
+9. Pinned control columns render identical frames on every level — never derive their geometry from the content grid's column count.
 
 ## When unsure
 

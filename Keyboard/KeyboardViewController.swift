@@ -217,14 +217,18 @@ final class KeyboardViewController: UIInputViewController {
     private enum KeyAction: Equatable {
         case word(String)
         case punct(String)
-        case category(Int)
         case char(String)
         case shift
-        case delete
-        case deleteWord
+        case delete       // pinned: one character
+        case deleteWord   // pinned
+        case clearAll     // pinned, two-tap armed (Task 3)
+        case cursorLeft   // pinned (Task 3)
+        case cursorRight  // pinned (Task 3)
+        case home         // pinned: back to the home board
+        case toCategories
+        case toWords(Int) // index into allCategories()
         case toLetters
         case toNumbers
-        case toGrid
         case space
         case ret
         case size
@@ -232,13 +236,20 @@ final class KeyboardViewController: UIInputViewController {
         case language
     }
 
+    private enum Level: Equatable {
+        case home, categories, letters, numbers
+        case words(Int) // index into allCategories()
+    }
+
     private struct Key {
         let action: KeyAction
         let label: String
         let view: UILabel
+        let row: Int
+        let col: Int // 0...contentColumns+1
+        let colSpan: Int
+        let rowSpan: Int
     }
-
-    private enum Layer: Equatable { case grid, letters, numbers }
 
     // Three height presets, cycled by the ⤢ key like Apple's keyboard
     // minimize behavior. Layout is fully width-responsive on top: when the
@@ -251,6 +262,15 @@ final class KeyboardViewController: UIInputViewController {
     private var lastCompact = false
     private let topBarHeight: CGFloat = 56
     private let debounceInterval: TimeInterval = 0.5
+
+    // The system can grant the extension's window LESS height than we
+    // request (iPadOS 26 reserves an input-assistant band above
+    // third-party keyboards). heightDeficit accumulates the measured
+    // shortfall so the REQUEST compensates for it; requestedHeight is
+    // what we ask the constraint for everywhere we used to ask for the
+    // raw preset. Capped at 160 so it can never runaway.
+    private var heightDeficit: CGFloat = 0
+    private var requestedHeight: CGFloat { sizePresets[sizeIndex] + heightDeficit }
 
     private var isCompact: Bool {
         view.bounds.width > 0 && view.bounds.width < 500
@@ -267,11 +287,38 @@ final class KeyboardViewController: UIInputViewController {
     private var pendingHeightFix = false
 
     private var keys: [Key] = []
-    private var layer: Layer = .grid
-    private var categoryIndex = 1 // Recents is 0; start on Core
+    private var level: Level = .home
+    private var clearArmedAt: Date?
+    private var lastIntentSignature: String?
+
+    // Compact (floating / Split View / Slide Over): word boards drop to 5
+    // wide-enough columns showing the first 20 content cells; the typing
+    // levels keep all 10 columns — a letter that isn't there at all is
+    // worse than a narrower key. Pinned columns never move: layoutKeys()
+    // sizes col 0 and the right pinned column from bounds.width alone
+    // (bounds.width / 12), never from contentColumns, so their frames are
+    // identical whether the content grid is 5 or 10 columns wide.
+    private var contentColumns: Int {
+        switch level {
+        case .letters, .numbers: return 10
+        default: return isCompact ? 5 : 10
+        }
+    }
+
+    private var isWordLevel: Bool {
+        switch level {
+        case .home, .categories, .words: return true
+        case .letters, .numbers: return false
+        }
+    }
     private var shifted = false
     private var lang: Lang = .en
     private var lastCommit: (action: KeyAction, at: Date)?
+
+    // Haptics are a no-op on iPads (no Taptic Engine) — wired anyway so an
+    // iPhone build gets them for free. The input click is the audible
+    // press feedback and needs no Full Access.
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
 
     private let trackingView = TrackingView()
     private var suggestionButtons: [UIButton] = []
@@ -325,7 +372,25 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        heightConstraint?.constant = sizePresets[sizeIndex]
+        heightConstraint?.constant = requestedHeight
+        let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
+        // Unconditional and unconditionally FIRST: reads and clears any
+        // pending restore on every single appearance, on every instance,
+        // whether or not this instance's own lastIntentSignature already
+        // matches. A note must never outlive the one appearance it was
+        // written for — see consumePendingRestore.
+        let restored = consumePendingRestore(matching: signature)
+        if signature != lastIntentSignature {
+            lastIntentSignature = signature
+            if let restored {
+                level = restored
+            } else {
+                applyIntentLevel()
+            }
+        } else if let restored {
+            level = restored // surviving instance after a ⌄ dismiss+retap: harmless reassert
+        }
+        buildKeys() // also refreshes the Go label for the new field
     }
 
     override func viewDidLayoutSubviews() {
@@ -341,7 +406,9 @@ final class KeyboardViewController: UIInputViewController {
         // Self-heal: if the container is still oversized once rotation has
         // settled, rebuild the height constraint from scratch — reasserting
         // the existing one is not always enough to shrink the window.
-        let drift = trackingView.bounds.height - sizePresets[sizeIndex]
+        // Compares against requestedHeight (not the raw preset) so it
+        // doesn't fight the undersize compensation below.
+        let drift = trackingView.bounds.height - requestedHeight
         if !isRotating, !pendingHeightFix, drift > 1, healAttempts < 2, heightConstraint != nil {
             pendingHeightFix = true
             healAttempts += 1
@@ -349,13 +416,42 @@ final class KeyboardViewController: UIInputViewController {
                 guard let self, let constraint = self.heightConstraint else { return }
                 // A genuine value change — same-value updates are no-ops to
                 // the layout engine and never shrink the stale window.
-                constraint.constant = self.sizePresets[self.sizeIndex] - 2
+                constraint.constant = self.requestedHeight - 2
                 self.view.setNeedsLayout()
                 self.view.layoutIfNeeded()
-                constraint.constant = self.sizePresets[self.sizeIndex]
+                constraint.constant = self.requestedHeight
                 self.view.setNeedsLayout()
                 self.view.layoutIfNeeded()
                 self.pendingHeightFix = false
+            }
+        }
+
+        // Compensate: the system can hand the extension LESS height than
+        // trackingView requests (iPadOS 26 reserves an input-assistant
+        // band above third-party keyboards). Measure the shortfall
+        // against the real container and bump the request by exactly
+        // that much — guarded to escalate only when a NEW, larger
+        // deficit is measured, so this can never compound into the
+        // historic growth-loop bug documented at the top of this file.
+        // The 160pt cap is applied BEFORE the comparison (not just to
+        // the stored value) — otherwise, once heightDeficit is capped,
+        // a stale/lagging view.bounds.height keeps reporting a raw
+        // deficit above the (now-static) capped value forever, and this
+        // block re-fires — and calls setNeedsLayout() — every single
+        // layout pass indefinitely.
+        // !isCompact: floating keyboard / Split View / Slide Over grants
+        // are small BY DESIGN — that is not the input-assistant-band
+        // shortfall this mechanism exists to compensate for. heightDeficit
+        // never decays on its own, so measuring a compact-mode grant here
+        // would let a float episode pin the deficit at the 160pt cap and
+        // then inflate the docked, full-width keyboard afterward.
+        if !isRotating, !isCompact, let constraint = heightConstraint, view.bounds.height > 0,
+           view.bounds.height < constraint.constant - 1 {
+            let deficit = min(constraint.constant - view.bounds.height, 160)
+            if deficit > heightDeficit {
+                heightDeficit = deficit
+                constraint.constant = requestedHeight
+                view.setNeedsLayout()
             }
         }
     }
@@ -368,10 +464,10 @@ final class KeyboardViewController: UIInputViewController {
         isRotating = true
         healAttempts = 0
         coordinator.animate(alongsideTransition: { _ in
-            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
+            self.heightConstraint?.constant = self.requestedHeight
             self.view.setNeedsLayout()
         }, completion: { _ in
-            self.heightConstraint?.constant = self.sizePresets[self.sizeIndex]
+            self.heightConstraint?.constant = self.requestedHeight
             self.view.setNeedsLayout()
             self.view.layoutIfNeeded()
             self.isRotating = false
@@ -402,58 +498,253 @@ final class KeyboardViewController: UIInputViewController {
         return [(recentsName, unique)] + vocabulary.map { ($0.name(lang), $0.words) }
     }
 
-    // MARK: Rows
+    // MARK: Frame (spec: pinned columns identical on every level)
 
-    private func rows(for layer: Layer) -> [[(KeyAction, String)]] {
-        switch layer {
-        case .grid:
-            // Compact (floating / Split View) shows fewer, still-big cells
-            // rather than shrinking all of them below usable target size.
-            var words = allCategories()[categoryIndex].words
-            let perRow = isCompact ? 4 : 6
-            if isCompact { words = Array(words.prefix(12)) }
-            var wordRows: [[(KeyAction, String)]] = []
-            for chunk in stride(from: 0, to: words.count, by: perRow) {
-                wordRows.append(words[chunk..<min(chunk + perRow, words.count)].map { word in
-                    let text = word.text(lang)
-                    return (word.wordClass == .punct ? KeyAction.punct(text) : KeyAction.word(text), text)
-                })
-            }
-            if wordRows.isEmpty {
-                let hint = lang == .ms
-                    ? "Perkataan yang kerap digunakan akan muncul di sini"
-                    : "Words you use often will appear here — tap to go to Core"
-                wordRows.append([(.category(1), hint)])
-            }
-            // No space or character-delete here: words insert their own
-            // spacing, and character-level fixing belongs to the letter
-            // layer — fewer keys means bigger targets.
-            wordRows.append([
-                (.toLetters, "abc"),
-                (.deleteWord, lang == .ms ? "⌫ kata" : "⌫ word"),
-                (.ret, "return"), (.language, lang == .en ? "EN" : "MS"),
-                (.size, "⤢"), (.dismiss, "⌄"),
-            ])
-            return wordRows
-        case .letters:
-            return [
-                "qwertyuiop".map { (KeyAction.char(String($0)), String($0)) },
-                "asdfghjkl".map { (KeyAction.char(String($0)), String($0)) },
-                [(.shift, "⇧")] + "zxcvbnm".map { (KeyAction.char(String($0)), String($0)) } + [(.delete, "⌫")],
-                [(.toGrid, "⊞ words"), (.toNumbers, "123"), (.space, "space"), (.ret, "return"), (.dismiss, "⌄")],
-            ]
-        case .numbers:
-            return [
-                "1234567890".map { (KeyAction.char(String($0)), String($0)) },
-                ["-", "/", ":", ";", "(", ")", "$", "&", "@"].map { (KeyAction.char($0), $0) },
-                [".", ",", "?", "!", "'", "\""].map { (KeyAction.char($0), $0) } + [(.delete, "⌫")],
-                [(.toGrid, "⊞ words"), (.toLetters, "abc"), (.space, "space"), (.ret, "return"), (.dismiss, "⌄")],
-            ]
+    private var leftColumn: [(KeyAction, String)] {
+        [(.home, "Home"),
+         (.clearAll, clearArmedAt == nil ? "Clear all" : "tap again"),
+         (.deleteWord, lang == .ms ? "⌫ kata" : "⌫ word"),
+         (.cursorLeft, "←")]
+    }
+
+    private var rightColumn: [(KeyAction, String)] {
+        [(.delete, "⌫"),
+         (.ret, goLabel()),
+         (.cursorRight, "→"),
+         (.dismiss, "⌄")]
+    }
+
+    /// allCategories() index of the Chat board (offset 1 for Recents).
+    private var chatWordsIndex: Int {
+        (vocabulary.firstIndex { $0.en == "Chat" } ?? 0) + 1
+    }
+
+    /// Spec: applied once when the keyboard attaches to a field; never
+    /// switches mid-typing. Manual navigation always wins afterwards.
+    ///
+    /// Keyboard extensions have no field-identity API, so `viewWillAppear`
+    /// only recomputes this mapping when the field's keyboardType/
+    /// returnKeyType signature differs from the last one THIS INSTANCE
+    /// saw (`lastIntentSignature`, plain in-memory — correct whenever the
+    /// instance itself survives the reshow, e.g. ordinary backgrounding/
+    /// foregrounding of a still-visible keyboard).
+    ///
+    /// Tapping the in-keyboard ⌄ key (`commit(.dismiss)`) can additionally
+    /// tear down and recreate the whole controller instance before the
+    /// field is retapped — instance survival across that specific
+    /// dismiss+retap is NOT an API guarantee either way, so
+    /// `commit(.dismiss)` also writes the current signature, level, and
+    /// a timestamp to UserDefaults via `persistPendingRestore`.
+    /// `viewWillAppear` calls `consumePendingRestore` UNCONDITIONALLY,
+    /// once, at the very top of every appearance — on every instance,
+    /// regardless of whether that instance's own `lastIntentSignature`
+    /// already matches — and the note is always read and cleared
+    /// together in that one call. It is applied only if the signature
+    /// still matches and it is no older than `pendingRestoreTTL` (120s).
+    /// That unconditional consume is what keeps the note from surviving
+    /// past the single reshow it was written for: a note nobody follows
+    /// up on (dismissed, never retapped) cannot linger to ambush some
+    /// unrelated later field that happens to share the same signature —
+    /// it is gone (read and cleared) the very next time ANY field
+    /// attaches, matching or not.
+    ///
+    /// Known accepted miss: retapping a *different* field that happens
+    /// to share the exact same signature within the TTL window of a
+    /// dismiss inherits the dismissed field's level instead of getting a
+    /// fresh mapping — there is no way to tell that case apart from a
+    /// re-show of the same field.
+    private func applyIntentLevel() {
+        switch textDocumentProxy.keyboardType {
+        case .numberPad?, .decimalPad?, .phonePad?:
+            level = .numbers; return
+        case .emailAddress?, .URL?, .webSearch?, .asciiCapable?:
+            level = .letters; return
+        default:
+            break
+        }
+        switch textDocumentProxy.returnKeyType {
+        case .search?, .google?, .yahoo?: level = .letters
+        case .send?: level = .words(chatWordsIndex)
+        default: level = .home
         }
     }
 
-    private func topBarKeys() -> [(KeyAction, String)] {
-        allCategories().enumerated().map { (KeyAction.category($0.offset), $0.element.name) }
+    /// A restore only makes sense moments after a dismiss — past this
+    /// age a note is more likely to ambush some unrelated later field
+    /// than to reflect a genuine reshow, so consumePendingRestore treats
+    /// it as absent (while still clearing it).
+    private let pendingRestoreTTL: TimeInterval = 120
+
+    /// Called right before `dismissKeyboard()` so the level survives even
+    /// if dismissing tears down this controller instance.
+    private func persistPendingRestore(signature: String, level: Level) {
+        let defaults = UserDefaults.standard
+        defaults.set(signature, forKey: "pendingRestoreSignature")
+        defaults.set(Date().timeIntervalSince1970, forKey: "pendingRestoreTimestamp")
+        switch level {
+        case .home: defaults.set("home", forKey: "pendingRestoreLevel")
+        case .categories: defaults.set("categories", forKey: "pendingRestoreLevel")
+        case .letters: defaults.set("letters", forKey: "pendingRestoreLevel")
+        case .numbers: defaults.set("numbers", forKey: "pendingRestoreLevel")
+        case .words(let index):
+            defaults.set("words", forKey: "pendingRestoreLevel")
+            defaults.set(index, forKey: "pendingRestoreWordsIndex")
+        }
+    }
+
+    /// Reads AND clears any pending restore from a prior dismiss —
+    /// called unconditionally, once, at the top of every
+    /// `viewWillAppear`, regardless of whether the caller's own
+    /// `lastIntentSignature` already matches. That unconditional call is
+    /// what guarantees a note never outlives the single appearance it
+    /// was written for: it is gone after this one read, whether or not
+    /// it matched. Returns the saved level only when the signature still
+    /// matches and the note is fresh (see `pendingRestoreTTL`); returns
+    /// nil (having still cleared it) otherwise.
+    private func consumePendingRestore(matching signature: String) -> Level? {
+        let defaults = UserDefaults.standard
+        let pendingSignature = defaults.string(forKey: "pendingRestoreSignature")
+        let pendingLevel = defaults.string(forKey: "pendingRestoreLevel")
+        let pendingWordsIndex = defaults.integer(forKey: "pendingRestoreWordsIndex")
+        let pendingTimestamp = defaults.object(forKey: "pendingRestoreTimestamp") as? TimeInterval
+        defaults.removeObject(forKey: "pendingRestoreSignature")
+        defaults.removeObject(forKey: "pendingRestoreLevel")
+        defaults.removeObject(forKey: "pendingRestoreWordsIndex")
+        defaults.removeObject(forKey: "pendingRestoreTimestamp")
+        guard pendingSignature == signature,
+              let pendingTimestamp, Date().timeIntervalSince1970 - pendingTimestamp <= pendingRestoreTTL
+        else { return nil }
+        switch pendingLevel {
+        case "home": return .home
+        case "categories": return .categories
+        case "letters": return .letters
+        case "numbers": return .numbers
+        case "words": return .words(pendingWordsIndex)
+        default: return nil
+        }
+    }
+
+    /// Go key follows the field, like the system keyboard's return key.
+    private func goLabel() -> String {
+        switch textDocumentProxy.returnKeyType {
+        case .search?, .google?, .yahoo?: return "Search"
+        case .send?: return "Send"
+        case .go?: return "Go"
+        case .done?: return "Done"
+        default: return "return"
+        }
+    }
+
+    /// A content cell that can span multiple grid slots (e.g. a wide
+    /// space bar, or a big 2x2 category tile). Default span is 1x1 — a
+    /// normal single cell.
+    private struct ContentCell {
+        let action: KeyAction
+        let label: String
+        let colSpan: Int
+        let rowSpan: Int
+
+        init(_ action: KeyAction, _ label: String, colSpan: Int = 1, rowSpan: Int = 1) {
+            self.action = action
+            self.label = label
+            self.colSpan = colSpan
+            self.rowSpan = rowSpan
+        }
+    }
+
+    /// Core + Chat fill the home board: 36 word cells + 4 nav cells = 4x10.
+    private var homeWords: [VocabWord] {
+        (vocabulary.first { $0.en == "Core" }?.words ?? []) +
+        (vocabulary.first { $0.en == "Chat" }?.words ?? [])
+    }
+
+    private func wordCell(_ word: VocabWord) -> ContentCell {
+        let text = word.text(lang)
+        return ContentCell(word.wordClass == .punct ? .punct(text) : .word(text), text)
+    }
+
+    private func contentRows(for level: Level) -> [[ContentCell?]] {
+        let cols = contentColumns
+        switch level {
+        case .home:
+            var cells: [ContentCell?] = [
+                ContentCell(.toCategories, "Categories"),
+                ContentCell(.toLetters, "abc"),
+                ContentCell(.language, lang == .en ? "EN" : "MS"),
+                ContentCell(.size, "⤢"),
+            ]
+            cells += homeWords.map { Optional(wordCell($0)) }
+            return chunk(cells, into: cols)
+        case .categories:
+            if cols >= 10 {
+                // Big targets suit the AAC use case: tile the full content
+                // area as 5x2 slots, each slot a 2x2 block of grid cells.
+                // 9 categories fill 9 of the 10 slots; the last 2x2 region
+                // stays empty (nearest-key gives it to an adjacent category).
+                var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
+                for (i, category) in allCategories().prefix(9).enumerated() {
+                    let slotRow = i / 5, slotCol = i % 5
+                    rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
+                }
+                return rows
+            } else {
+                // Compact: plain single cells, chunked like word boards.
+                let categories = allCategories()
+                let cells: [ContentCell?] = categories.prefix(9).enumerated().map { (i, category) in
+                    ContentCell(.toWords(i), category.name)
+                }
+                return chunk(cells, into: cols)
+            }
+        case .words(let index):
+            let categories = allCategories()
+            let words = index < categories.count ? categories[index].words : []
+            if words.isEmpty {
+                let hint = lang == .ms
+                    ? "Perkataan yang kerap digunakan akan muncul di sini"
+                    : "Words you use often will appear here"
+                var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
+                rows[0][0] = ContentCell(.toWords(1), hint, colSpan: cols)
+                return rows
+            }
+            let cells: [ContentCell?] = words.map { Optional(wordCell($0)) }
+            return chunk(cells, into: cols)
+        case .letters:
+            var rows: [[ContentCell?]] = [
+                "qwertyuiop".map { Optional(ContentCell(.char(String($0)), String($0))) },
+                "asdfghjkl".map { Optional(ContentCell(.char(String($0)), String($0))) } + [Optional(ContentCell(.shift, "⇧"))],
+                "zxcvbnm".map { Optional(ContentCell(.char(String($0)), String($0))) }
+                    + [Optional(ContentCell(.char(","), ",")), Optional(ContentCell(.char("."), ".")), Optional(ContentCell(.char("?"), "?"))],
+                Array(repeating: nil, count: cols),
+            ]
+            rows[3][0] = ContentCell(.space, "space", colSpan: 8)
+            rows[3][8] = ContentCell(.toNumbers, "123", colSpan: 2)
+            return rows
+        case .numbers:
+            var rows: [[ContentCell?]] = [
+                "1234567890".map { Optional(ContentCell(.char(String($0)), String($0))) },
+                ["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""].map { Optional(ContentCell(.char($0), $0)) },
+                [".", ",", "?", "!", "'"].map { Optional(ContentCell(.char($0), $0)) },
+                Array(repeating: nil, count: cols),
+            ]
+            rows[2] += Array(repeating: nil, count: cols - rows[2].count)
+            rows[3][0] = ContentCell(.space, "space", colSpan: 8)
+            rows[3][8] = ContentCell(.toLetters, "abc", colSpan: 2)
+            return rows
+        }
+    }
+
+    /// Pack cells row-major into exactly 4 rows of `cols`, padding with nil.
+    private func chunk(_ cells: [ContentCell?], into cols: Int) -> [[ContentCell?]] {
+        var rows: [[ContentCell?]] = []
+        for start in stride(from: 0, to: cells.count, by: cols) {
+            rows.append(Array(cells[start..<min(start + cols, cells.count)]))
+        }
+        while rows.count < 4 { rows.append([]) }
+        rows = Array(rows.prefix(4))
+        for i in rows.indices where rows[i].count < cols {
+            rows[i] += Array(repeating: nil, count: cols - rows[i].count)
+        }
+        return rows
     }
 
     // MARK: Building
@@ -476,28 +767,29 @@ final class KeyboardViewController: UIInputViewController {
     private func buildKeys() {
         keys.forEach { $0.view.removeFromSuperview() }
         keys = []
+        // A mid-slide rebuild (e.g. clear-all's relabel, a level switch)
+        // can shrink the key count while a touch is still moving; a stale
+        // highlightedIndex from the old, larger array would then index
+        // out of bounds in the next touchMoved restyle.
+        highlightedIndex = nil
         globeButton?.removeFromSuperview()
         globeButton = nil
 
-        var defs = rows(for: layer).flatMap { $0 }
-        if layer == .grid {
-            defs = topBarKeys() + defs
+        let content = contentRows(for: level)
+
+        for row in 0..<4 {
+            addKey(leftColumn[row], row: row, col: 0)
+            for (i, cell) in content[row].enumerated() {
+                if let cell {
+                    addKey((cell.action, cell.label), row: row, col: i + 1, colSpan: cell.colSpan, rowSpan: cell.rowSpan)
+                }
+            }
+            addKey(rightColumn[row], row: row, col: contentColumns + 1)
         }
 
-        for (action, label) in defs {
-            let keyLabel = UILabel()
-            keyLabel.numberOfLines = 2
-            keyLabel.textAlignment = .center
-            keyLabel.adjustsFontSizeToFitWidth = true
-            keyLabel.minimumScaleFactor = 0.5
-            keyLabel.layer.cornerRadius = 10
-            keyLabel.layer.masksToBounds = true
-            keyLabel.isUserInteractionEnabled = false
-            style(keyLabel, action: action, label: label, highlighted: false)
-            trackingView.addSubview(keyLabel)
-            keys.append(Key(action: action, label: label, view: keyLabel))
-        }
-
+        // The globe lives in the top suggestion bar (same slot on every
+        // level and every device), never in the content grid — it used
+        // to overwrite the last home cell ("haha"), silently dropping it.
         if needsInputModeSwitchKey {
             let globe = UIButton(type: .system)
             globe.setImage(UIImage(systemName: "globe"), for: .normal)
@@ -513,13 +805,27 @@ final class KeyboardViewController: UIInputViewController {
         view.setNeedsLayout()
     }
 
+    private func addKey(_ def: (KeyAction, String), row: Int, col: Int, colSpan: Int = 1, rowSpan: Int = 1) {
+        let keyLabel = UILabel()
+        keyLabel.numberOfLines = 2
+        keyLabel.textAlignment = .center
+        keyLabel.adjustsFontSizeToFitWidth = true
+        keyLabel.minimumScaleFactor = 0.5
+        keyLabel.layer.cornerRadius = 10
+        keyLabel.layer.masksToBounds = true
+        keyLabel.isUserInteractionEnabled = false
+        style(keyLabel, action: def.0, label: def.1, highlighted: false)
+        trackingView.addSubview(keyLabel)
+        keys.append(Key(action: def.0, label: def.1, view: keyLabel, row: row, col: col, colSpan: colSpan, rowSpan: rowSpan))
+    }
+
     private func style(_ label: UILabel, action: KeyAction, label text: String, highlighted: Bool) {
         if highlighted {
             label.backgroundColor = .systemBlue
             label.textColor = .white
-        } else if case .category(let i) = action {
-            label.backgroundColor = i == categoryIndex ? .systemBlue : .systemGray4
-            label.textColor = i == categoryIndex ? .white : .label
+        } else if case .toWords = action {
+            label.backgroundColor = .systemGray4
+            label.textColor = .label
         } else if case .word(let w) = action, let word = vocabIndex[w] {
             label.backgroundColor = word.wordClass.color
             label.textColor = .black
@@ -554,14 +860,14 @@ final class KeyboardViewController: UIInputViewController {
             label.attributedText = nil
             label.font = .systemFont(ofSize: 28, weight: .semibold)
             label.text = text
-        case .category:
+        case .toWords, .toCategories:
             label.attributedText = nil
             label.font = .systemFont(ofSize: 17, weight: .semibold)
             label.text = text
         case .char:
             label.attributedText = nil
             label.font = .systemFont(ofSize: 34, weight: .medium)
-            label.text = layer == .letters && shifted ? text.uppercased() : text
+            label.text = level == .letters && shifted ? text.uppercased() : text
         default:
             label.attributedText = nil
             label.font = .systemFont(ofSize: 22, weight: .medium)
@@ -578,72 +884,76 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Layout
 
     private func layoutKeys() {
-        // Never lay out against more height than the active preset — if the
-        // container is transiently oversized (mid-rotation), keys would
-        // otherwise scale up with it and stick that way.
         let fullBounds = trackingView.bounds
         var bounds = fullBounds
-        bounds.size.height = min(bounds.height, sizePresets[sizeIndex])
+        // viewDidLayoutSubviews compensates the height REQUEST when the
+        // system grants less than we asked for; this clamp is only a
+        // defensive floor for the transient frame before that lands, so
+        // it targets the raw preset — not the (possibly inflated)
+        // requested height — and converges to the designed size.
+        bounds.size.height = min(bounds.height, min(view.bounds.height > 0 ? view.bounds.height : sizePresets[sizeIndex], sizePresets[sizeIndex]))
         guard bounds.width > 0, !keys.isEmpty else { return }
-        // Anchor the keyboard band to the BOTTOM of the container: when the
-        // system hands us an oversized container after rotation, the gap
-        // opens above the keys (where the app content is) instead of
-        // leaving a dead band under them.
         let yOffset = fullBounds.height - bounds.height
         layoutYOffset = yOffset
         boardBackground.frame = CGRect(
             x: 0, y: yOffset, width: fullBounds.width, height: fullBounds.height - yOffset)
         let inset: CGFloat = 4
 
-        let barWidth = bounds.width - inset * 2
+        // The globe gets a fixed square slot at the right end of the top
+        // bar — same place on every level and device — instead of living
+        // inside the content grid, where it used to silently overwrite
+        // whatever cell was last in the bottom row.
+        let globeWidth: CGFloat = globeButton != nil ? (topBarHeight - inset * 2) : 0
+        let barWidth = bounds.width - inset * 2 - globeWidth
         let slotWidth = barWidth / 3
         for (i, button) in suggestionButtons.enumerated() {
             button.frame = CGRect(
                 x: inset + CGFloat(i) * slotWidth + 3, y: yOffset + inset,
                 width: slotWidth - 6, height: topBarHeight - inset * 2)
         }
-
-        var keyIndex = 0
-        var gridTop = yOffset + topBarHeight
-
-        if layer == .grid {
-            let tabs = topBarKeys()
-            let tabHeight: CGFloat = 44
-            let tabWidth = bounds.width / CGFloat(tabs.count)
-            for i in 0..<tabs.count {
-                keys[keyIndex].view.frame = CGRect(
-                    x: CGFloat(i) * tabWidth + 2, y: yOffset + topBarHeight + 2,
-                    width: tabWidth - 4, height: tabHeight - 4)
-                keyIndex += 1
-            }
-            gridTop = yOffset + topBarHeight + tabHeight
+        if let globe = globeButton {
+            globe.frame = CGRect(
+                x: bounds.width - inset - globeWidth, y: yOffset + inset,
+                width: globeWidth, height: topBarHeight - inset * 2)
         }
 
-        let rowDefs = rows(for: layer)
-        let rowHeight = (fullBounds.height - gridTop) / CGFloat(rowDefs.count)
+        // Pinned columns are sized from bounds.width alone — never from
+        // contentColumns — so col 0 and the right pinned column land on
+        // the exact same frame whether the content grid is 5 columns
+        // (compact) or 10 (full width/typing levels). pinnedW is
+        // identical to the old uniform cell width (bounds.width / 12,
+        // since there are always 2 pinned columns + up to 10 content
+        // columns at full width); at contentColumns == 10 this makes
+        // contentW == pinnedW == bounds.width / 12 too, so the geometry
+        // below is numerically identical to the pre-fix single-cellW
+        // math at full width — only compact mode's content columns
+        // (still evenly split, just across 5 instead of 10) differ.
+        let pinnedW = bounds.width / 12
+        let contentW = (bounds.width - 2 * pinnedW) / CGFloat(contentColumns)
+        let gridTop = yOffset + topBarHeight
+        let rowH = (fullBounds.height - gridTop) / 4
+        // A transient sub-topBarHeight container (before the height
+        // compensation above lands) would otherwise yield negative
+        // frames here — bail rather than draw them.
+        guard rowH > 0 else { return }
 
-        for (rowIdx, row) in rowDefs.enumerated() {
-            let y = gridTop + CGFloat(rowIdx) * rowHeight
-            let isBottomRow = rowIdx == rowDefs.count - 1
-            let globeWidth: CGFloat = (isBottomRow && globeButton != nil) ? bounds.width / 9 : 0
-            let available = bounds.width - globeWidth
-            var x: CGFloat = 0
-
-            for (colIdx, item) in row.enumerated() {
-                var width = available / CGFloat(row.count)
-                if isBottomRow && row.count > 1 && row.contains(where: { $0.0 == .space }) {
-                    let spaceShare: CGFloat = isCompact ? 0.25 : 0.4
-                    let otherShare = (1 - spaceShare) / CGFloat(row.count - 1)
-                    width = available * (item.0 == .space ? spaceShare : otherShare)
-                }
-                if isBottomRow && colIdx == 1 && globeButton != nil {
-                    globeButton!.frame = CGRect(x: x + 3, y: y + 3, width: globeWidth - 6, height: rowHeight - 6)
-                    x += globeWidth
-                }
-                keys[keyIndex].view.frame = CGRect(x: x + 3, y: y + 3, width: width - 6, height: rowHeight - 6)
-                x += width
-                keyIndex += 1
+        for key in keys {
+            let x: CGFloat
+            let width: CGFloat
+            if key.col == 0 {
+                x = 0
+                width = pinnedW
+            } else if key.col == contentColumns + 1 {
+                x = bounds.width - pinnedW
+                width = pinnedW
+            } else {
+                x = pinnedW + CGFloat(key.col - 1) * contentW
+                width = contentW * CGFloat(key.colSpan)
             }
+            key.view.frame = CGRect(
+                x: x + 3,
+                y: gridTop + CGFloat(key.row) * rowH + 3,
+                width: width - 6, height: rowH * CGFloat(key.rowSpan) - 6)
         }
     }
 
@@ -672,10 +982,10 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// No dead zones: any point below the suggestion bar maps to the
-    /// nearest key by center distance.
+    /// nearest key by center distance. The globe now lives in the top
+    /// bar, so this guard already excludes it — no separate check needed.
     private func keyIndex(at point: CGPoint) -> Int? {
         guard point.y > layoutYOffset + topBarHeight else { return nil } // suggestion buttons handle themselves
-        if let globe = globeButton, globe.frame.contains(point) { return nil }
         var best: (index: Int, distance: CGFloat)?
         for (i, key) in keys.enumerated() {
             if key.view.frame.contains(point) { return i }
@@ -689,12 +999,15 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Committing
 
     private func commit(_ action: KeyAction) {
-        // Double-tap guard; deletes are exempt — repeats are intentional.
-        if action != .delete, action != .deleteWord,
+        // Double-tap guard; delete, word-delete, clear-all, and the
+        // cursor arrows are exempt — repeats are intentional for those.
+        if !isDebounceExempt(action),
            let last = lastCommit, last.action == action,
            Date().timeIntervalSince(last.at) < debounceInterval {
             return
         }
+        UIDevice.current.playInputClick()
+        impactFeedback.impactOccurred()
         lastCommit = (action, Date())
 
         switch action {
@@ -702,9 +1015,6 @@ final class KeyboardViewController: UIInputViewController {
             insertWord(w)
         case .punct(let p):
             insertPunctuation(p)
-        case .category(let i):
-            categoryIndex = i
-            buildKeys()
         case .char(let c):
             textDocumentProxy.insertText(shifted ? c.uppercased() : c)
             if shifted { shifted = false; restyleAll() }
@@ -715,12 +1025,22 @@ final class KeyboardViewController: UIInputViewController {
             textDocumentProxy.deleteBackward()
         case .deleteWord:
             deleteLastWord()
+        case .home:
+            level = .home; buildKeys()
+        case .toCategories:
+            level = .categories; buildKeys()
+        case .toWords(let i):
+            level = .words(i); buildKeys()
         case .toLetters:
-            layer = .letters; buildKeys()
+            level = .letters; buildKeys()
         case .toNumbers:
-            layer = .numbers; buildKeys()
-        case .toGrid:
-            layer = .grid; buildKeys()
+            level = .numbers; buildKeys()
+        case .clearAll:
+            handleClearAll()
+        case .cursorLeft:
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: -1)
+        case .cursorRight:
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: 1)
         case .space:
             textDocumentProxy.insertText(" ")
         case .ret:
@@ -728,8 +1048,10 @@ final class KeyboardViewController: UIInputViewController {
         case .size:
             sizeIndex = (sizeIndex + 1) % sizePresets.count
             UserDefaults.standard.set(sizeIndex, forKey: "sizeIndex")
-            heightConstraint?.constant = sizePresets[sizeIndex]
+            heightConstraint?.constant = requestedHeight
         case .dismiss:
+            let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
+            persistPendingRestore(signature: signature, level: level)
             dismissKeyboard()
         case .language:
             // Same positions, new labels — muscle memory survives the switch.
@@ -738,6 +1060,47 @@ final class KeyboardViewController: UIInputViewController {
             buildKeys()
         }
         updateSuggestions()
+    }
+
+    /// Repeats are intentional for deletes and cursor movement; clear-all
+    /// has its own two-tap arm and must not have its second tap swallowed.
+    private func isDebounceExempt(_ action: KeyAction) -> Bool {
+        switch action {
+        case .delete, .deleteWord, .clearAll, .cursorLeft, .cursorRight: return true
+        default: return false
+        }
+    }
+
+    private func handleClearAll() {
+        if let armed = clearArmedAt, Date().timeIntervalSince(armed) < 3 {
+            clearArmedAt = nil
+            clearAllText()
+            buildKeys() // restore the "Clear all" label
+            return
+        }
+        clearArmedAt = Date()
+        buildKeys() // relabel to "tap again"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, self.clearArmedAt != nil else { return }
+            if Date().timeIntervalSince(self.clearArmedAt!) >= 3 {
+                self.clearArmedAt = nil
+                self.buildKeys() // disarm quietly
+            }
+        }
+    }
+
+    /// Clears everything the field exposes. Extensions only see a context
+    /// window; in his real use (messages, search) that is the whole text.
+    private func clearAllText() {
+        if let after = textDocumentProxy.documentContextAfterInput, !after.isEmpty {
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: after.count)
+        }
+        var passes = 0
+        while let before = textDocumentProxy.documentContextBeforeInput,
+              !before.isEmpty, passes < 200 {
+            for _ in 0..<before.count { textDocumentProxy.deleteBackward() }
+            passes += 1
+        }
     }
 
     private func contextBefore() -> String {
@@ -827,7 +1190,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func updateSuggestions() {
         let titles: [String]
-        if layer == .grid {
+        if isWordLevel {
             titles = predictNextWords()
         } else {
             let word = currentPartialWord()
@@ -853,7 +1216,9 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func suggestionTapped(_ sender: UIButton) {
         guard let title = sender.title(for: .normal) else { return }
-        if layer == .grid {
+        UIDevice.current.playInputClick()
+        impactFeedback.impactOccurred()
+        if isWordLevel {
             insertWord(title)
         } else {
             let word = currentPartialWord()
@@ -866,8 +1231,10 @@ final class KeyboardViewController: UIInputViewController {
 
 /// Routes raw touches to the controller so keys commit on lift-off
 /// rather than touch-down.
-private final class TrackingView: UIView {
+private final class TrackingView: UIView, UIInputViewAudioFeedback {
     weak var controller: KeyboardViewController?
+
+    var enableInputClicksWhenVisible: Bool { true }
 
     // Let touches above the keyboard band fall through to the app instead
     // of being swallowed by a transparent, oversized container.

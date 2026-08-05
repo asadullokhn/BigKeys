@@ -29,17 +29,20 @@ Every interaction decision traces to a specific research finding:
 
 ## Features (current state)
 
-- Word grid, one tap = one word, with automatic spacing and sentence-start capitalization
-- Category tabs: Recents / Core / People / Actions / Feelings / Food / Places / Art / Chat
+- Uniform frame on every level: pinned control columns — Home, Clear all, word-delete, cursor-left on the left; char-delete, Go, cursor-right, dismiss on the right — flank a 4×10 content grid. The pinned columns render identical frames regardless of level, so muscle memory for "delete is always over there" survives every navigation
+- Three levels deep: the home word board (Core + Chat vocabulary) → Categories → a category's words. Letters and numbers are a parallel typing track reached via the abc/123 cells, for words not in the grid
+- Category tiles: Recents / Core / People / Actions / Feelings / Food / Places / Art / Chat
 - Recents learns his 12 most-used words automatically
-- Next-word prediction: on-device bigram model, seeded with defaults, learns his real word patterns over time — shown in the suggestion bar
+- Prediction bar above the grid, with the globe key fixed at its right end (same slot on every level and device) — next-word prediction is an on-device bigram model, seeded with defaults, learning his real word patterns over time
 - Letter keyboard (large-key QWERTY) and numbers layer as fallback, with system spell-checker word completions
 - Word-level delete (one tap removes the whole last word)
 - Punctuation cells that attach to the preceding word
 - Two languages: English and Malay (Bahasa Melayu), toggled by the EN/MS key. Language switching relabels cells in place — grid positions never move, so muscle memory survives the switch. Prediction seeds, category names, and spell-check completions all follow the active language. Malay translations are drafts pending verification with Fadillah
 - Three height presets cycled by the size key, persisted between sessions
 - Dismiss key, like Apple's iPad keyboard
-- Responsive layout: drops to a compact 4-column grid when the system narrows the keyboard (floating, Split View, Slide Over)
+- Field-type intent mapping: the keyboard opens on the level that matches the focused field (e.g. a search field opens on letters, a numeric field opens on numbers) — applied once per field, never mid-typing; manual navigation always wins afterward
+- Key-commit feedback: every committed tap plays the system input click and a light haptic impulse
+- Responsive layout: word boards drop to a compact 5-column content grid when the system narrows the keyboard (floating, Split View, Slide Over); the letters and numbers levels keep all 10 columns so no character goes missing. Pinned columns never change width or position, at any width
 - All learning (usage counts, bigrams) stays in the keyboard's own sandbox — no network, no shared containers, no Full Access
 
 ## Project structure

@@ -11,6 +11,7 @@
 		BD0A5FD32803881CA17B7DEC /* KeyboardHeightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D4A53F563947B528BCE908 /* KeyboardHeightTests.swift */; };
 		D098B6C6760377071DCF40D5 /* BigKeysApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D0A82554924F1658C861E7 /* BigKeysApp.swift */; };
 		D410A13770C140F1152B1462 /* BigKeysKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CECCBF22BC051903966AC42C /* BigKeysKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F001F8CA7BD5FE7CFFBBF3EA /* PinnedFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 665E2C08E776FDE73D64D4AB /* PinnedFrameTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,6 +48,7 @@
 /* Begin PBXFileReference section */
 		33F0303FA60BE7B030656F3C /* BigKeysUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BigKeysUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		403B729EABDE2C69CD52D1C0 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		665E2C08E776FDE73D64D4AB /* PinnedFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedFrameTests.swift; sourceTree = "<group>"; };
 		75BC06D41488807AE1F6EC22 /* BigKeys.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BigKeys.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB710CD4CA71312AFA731698 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CECCBF22BC051903966AC42C /* BigKeysKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BigKeysKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -78,6 +80,7 @@
 			isa = PBXGroup;
 			children = (
 				F7D4A53F563947B528BCE908 /* KeyboardHeightTests.swift */,
+				665E2C08E776FDE73D64D4AB /* PinnedFrameTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -208,6 +211,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BD0A5FD32803881CA17B7DEC /* KeyboardHeightTests.swift in Sources */,
+				F001F8CA7BD5FE7CFFBBF3EA /* PinnedFrameTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
