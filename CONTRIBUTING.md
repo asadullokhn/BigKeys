@@ -31,7 +31,7 @@ These come from the team's community research — breaking them breaks the produ
 2. **Explore-then-commit stays.** Touch-down must never type. Sliding highlights; lifting commits.
 3. **The 0.5s double-tap guard stays** (delete, word-delete, clear-all, and the cursor arrows are exempt).
 4. **No dead zones** — every point maps to the nearest key.
-5. **No Full Access** without a deliberate team decision. Prediction stays on-device.
+5. **Full Access requested as of 2026-08-05** (deliberate team decision) — solely for the app-group container. The keyboard must stay fully functional without the grant, and the keyboard makes no network calls, granted or not. Prediction stays on-device.
 6. **Prediction lives in the suggestion bar only** — never inside the grid.
 7. **Language switching relabels in place** — positions never move between languages.
 8. Malay strings are unverified drafts until checked with the community. Mark any new translation as unverified in your PR description.

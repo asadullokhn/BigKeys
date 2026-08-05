@@ -26,7 +26,7 @@ The full list with reasoning lives in `CONTRIBUTING.md`. The short version:
 2. Touch-down never types. Lift-off commits. Sliding is free exploration.
 3. Same-key commits within 0.5s are ignored (delete, word-delete, clear-all, and the cursor arrows are exempt).
 4. Every point on the keyboard maps to the nearest key — no dead zones.
-5. `RequestsOpenAccess` stays `false`. No network calls, no shared containers, no Full Access — this is a deliberate product decision, not an oversight.
+5. `RequestsOpenAccess` is `true` as of 2026-08-05 (team decision, Ali) to enable the app-group container powering app ↔ keyboard data. Two hard rules survive the flip: the keyboard must remain FULLY functional when Full Access is not granted (never gate typing, prediction, or learning-in-sandbox on the grant), and **no network calls from the keyboard, ever** — granted or not. The shared container is the only thing the permission is for.
 6. Prediction appears only in the suggestion bar, never by reordering the grid.
 7. Language switching relabels cells in place.
 8. Malay vocabulary is an unverified draft — flag any translation you add as unverified.

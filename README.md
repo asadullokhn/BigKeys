@@ -24,7 +24,7 @@ Every interaction decision traces to a specific research finding:
 | 0.5s double-tap guard: repeat commits of the same key are ignored | Game Accessibility Guidelines debounce recommendation (game-controllers research) |
 | No dead zones: every point on the surface maps to the nearest key | The core insight that his problem is precision — there is no "between keys" to miss into |
 | Prediction lives in the suggestion bar; grid cells never reorder | Motor planning depends on stable target positions — moving targets destroy AAC fluency |
-| No Full Access permission | App Store Guideline 4.4.1 requires keyboards to work without it; prediction runs fully on-device so we never need to ask |
+| Full Access requested, never required | The grant unlocks only the shared app-group container (app-editable data). Typing, prediction, and learning all work ungranted (Guideline 4.4.1); the keyboard makes no network calls either way |
 | Design for one person, let it generalize | "We're not trying to design for all of us, we're trying to design for each of us" — Bryce Johnson, Xbox Adaptive Controller co-inventor |
 
 ## Features (current state)
@@ -44,7 +44,7 @@ Every interaction decision traces to a specific research finding:
 - Field-type intent mapping: the keyboard opens on the level that matches the focused field (e.g. a search field opens on letters, a numeric field opens on numbers) — applied once per field, never mid-typing; manual navigation always wins afterward
 - Key-commit feedback: every committed tap plays the system input click and a light haptic impulse
 - Responsive layout: word boards drop to a compact 5-column content grid when the system narrows the keyboard (floating, Split View, Slide Over); the letters and numbers levels keep all 10 columns so no character goes missing. Pinned columns never change width or position, at any width
-- All learning (usage counts, bigrams) stays in the keyboard's own sandbox — no network, no shared containers, no Full Access
+- All learning (usage counts, bigrams) stays on-device: in the shared app-group container when Full Access is granted (so the app can read it), in the keyboard's own sandbox when not — never on a network
 
 ## Project structure
 
@@ -76,7 +76,7 @@ First run on a new device needs Developer Mode enabled (Settings → Privacy & S
 ## Known limitations / not yet decided
 
 - Malay vocabulary was drafted by the team, not by a native-speaking AAC user — verify every word with Fadillah before testing with Sayfullah. Singaporean Malay has colloquial forms a dictionary translation misses.
-- Vocabulary is hardcoded. Editable vocabulary shared from the container app requires an App Group, which for keyboard extensions requires Full Access — that's a real architecture decision to make deliberately, not stumble into.
+- Vocabulary is hardcoded. The App Group + Full Access groundwork for app-edited vocabulary landed 2026-08-05; the editing UI itself does not exist yet.
 - No speech output. Audio in keyboard extensions is gated behind Full Access (this is exactly what Keeble does: on-device prediction free, speech gated). Same deliberate decision needed.
 - Apple Foundation Models sentence completion is on the roadmap, deliberately not in the MVP. Open research question: extensions may be sandboxed away from the on-device model — needs a 5-minute empirical test (`SystemLanguageModel.availability` from inside the extension) before that feature is ever promised.
 - True detachable floating (drag the keyboard anywhere) is not possible for keyboard extensions — the system owns that window. Our responsive layout handles whatever size the system gives us instead.

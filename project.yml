@@ -37,6 +37,11 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    entitlements:
+      path: App/Typikey.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.asadullokh.ch5.typikey
     dependencies:
       - target: TypikeyKeyboard
         embed: true
@@ -65,11 +70,16 @@ targets:
             IsASCIICapable: true
             PrefersRightToLeft: false
             PrimaryLanguage: en-US
-            RequestsOpenAccess: false
+            RequestsOpenAccess: true
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey.keyboard
+    entitlements:
+      path: Keyboard/TypikeyKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.asadullokh.ch5.typikey
 schemes:
   Typikey:
     build:

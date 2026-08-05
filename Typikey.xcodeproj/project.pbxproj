@@ -55,11 +55,13 @@
 		540443137A743CBC5FFF53C0 /* Typikey.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Typikey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		671DF4A1D7A2DABAD334557F /* TypikeyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TypikeyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FA3846751FF38D84B3414E5 /* TypikeyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypikeyApp.swift; sourceTree = "<group>"; };
+		8A0596DADB8E2918F9CB0FF9 /* Typikey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Typikey.entitlements; sourceTree = "<group>"; };
 		8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
 		BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionEngine.swift; sourceTree = "<group>"; };
 		D977763A87F89006584A3902 /* KeyboardHeightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHeightTests.swift; sourceTree = "<group>"; };
 		DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		EC274687C47E96AD04FD45F5 /* TypikeyKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TypikeyKeyboard.entitlements; sourceTree = "<group>"; };
 		F14E0151DBA04E506C934CB8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F6AB8DF9F06A51C18A94A9DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F83C0D6BAF2B10D4444DD9A7 /* TypikeyKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TypikeyKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -92,6 +94,7 @@
 				238704140C8DFC7E10D738C7 /* Assets.xcassets */,
 				F14E0151DBA04E506C934CB8 /* Info.plist */,
 				E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */,
+				8A0596DADB8E2918F9CB0FF9 /* Typikey.entitlements */,
 				7FA3846751FF38D84B3414E5 /* TypikeyApp.swift */,
 			);
 			path = App;
@@ -113,6 +116,7 @@
 				F6AB8DF9F06A51C18A94A9DE /* Info.plist */,
 				8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */,
 				DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */,
+				EC274687C47E96AD04FD45F5 /* TypikeyKeyboard.entitlements */,
 			);
 			path = Keyboard;
 			sourceTree = "<group>";
@@ -303,6 +307,7 @@
 		4A4C8218B1C4FAD8A3E8CD4B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Keyboard/TypikeyKeyboard.entitlements;
 				INFOPLIST_FILE = Keyboard/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -381,6 +386,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Typikey.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
@@ -466,6 +472,7 @@
 		BF186799726823D3D4F22184 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Keyboard/TypikeyKeyboard.entitlements;
 				INFOPLIST_FILE = Keyboard/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -498,6 +505,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Typikey.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
