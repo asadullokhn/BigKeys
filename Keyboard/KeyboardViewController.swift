@@ -413,8 +413,25 @@ final class KeyboardViewController: UIInputViewController {
         boardBackground.backgroundColor = .systemBackground
         trackingView.addSubview(boardBackground)
 
+        let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
+        trackingView.addGestureRecognizer(hover)
+
         buildSuggestionBar()
         buildKeys()
+    }
+
+    // Pointer support (trackpad, Apple Pencil hover, AssistiveTouch
+    // pointer devices): moves the same explore highlight touch does, but
+    // never commits — lift/click still drives commit via touchLifted.
+    @objc private func handleHover(_ g: UIHoverGestureRecognizer) {
+        switch g.state {
+        case .began, .changed:
+            touchMoved(to: g.location(in: trackingView))
+        case .ended, .cancelled, .failed:
+            touchCancelled()
+        default:
+            break
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
