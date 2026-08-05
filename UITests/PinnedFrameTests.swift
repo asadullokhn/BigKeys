@@ -65,6 +65,24 @@ final class PinnedFrameTests: XCTestCase {
                       "manual level was reset on re-show — intent mapping must not refire for an unchanged field signature")
     }
 
+    // On the simulator FoundationModels generation always fails, so this
+    // asserts the degrade contract: the bar and typing behave exactly as
+    // before the completion feature existed.
+    func testDegradedCompletionKeepsBarWorking() {
+        let app = launchToTypikey()
+        app.staticTexts["want"].tap()
+        // .firstMatch: once this pair has run before, the learned-bigram
+        // suggestion bar (existing feature, unrelated to completion) also
+        // offers "I" after "want", so the plain label is ambiguous. Both
+        // the grid cell and the suggestion button route through the same
+        // insertWord(_:), so either match proves the same thing.
+        app.staticTexts["I"].firstMatch.tap()
+        let value = practiceField(in: app).value as? String ?? ""
+        XCTAssertTrue(value.contains("Want") && value.contains("I"),
+                      "typing must work while the completion engine is degraded, got: \(value)")
+        XCTAssertTrue(app.staticTexts["Home"].exists, "keyboard frame must be intact")
+    }
+
     // MARK: helpers
 
     private func launchToTypikey() -> XCUIApplication {

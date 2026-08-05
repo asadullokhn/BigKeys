@@ -34,6 +34,7 @@ Every interaction decision traces to a specific research finding:
 - Category tiles: Recents / Core / People / Actions / Feelings / Food / Places / Art / Chat
 - Recents learns his 12 most-used words automatically
 - Prediction bar above the grid, with the globe key fixed at its right end (same slot on every level and device) — next-word prediction is an on-device bigram model, seeded with defaults, learning his real word patterns over time
+- Phrase completion (iOS 26 devices with Apple Intelligence): the bar offers a short continuation in the user's own vocabulary — tap the phrase to take it all, or ▸ to take one word. Generated entirely on device; on unsupported devices the bar simply shows word prediction as before.
 - Letter keyboard (large-key QWERTY) and numbers layer as fallback, with system spell-checker word completions
 - Word-level delete (one tap removes the whole last word)
 - Punctuation cells that attach to the preceding word
