@@ -17,51 +17,71 @@ struct SetupView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Label("Typikey is a keyboard with large targets, built for people with limited fine motor control.", systemImage: "keyboard")
-                        .font(.title3)
-                        .padding(.vertical, 8)
-                }
-                Section("Try it here") {
-                    TextField("Tap here, hold the globe key, choose Typikey", text: $practiceText, axis: .vertical)
-                        .font(.title2)
-                        .lineLimit(3...6)
-                }
-                Section("Enable the keyboard") {
-                    step(1, "Open Settings")
-                    step(2, "General → Keyboard → Keyboards")
-                    step(3, "Add New Keyboard…")
-                    step(4, "Select Typikey")
-                }
-                Section("Use it") {
-                    step(1, "Open any app with a text field (Notes, Messages)")
-                    step(2, "Tap the text field, then hold the globe key")
-                    step(3, "Select Typikey")
-                }
-                Section {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HeroHeader()
+
+                    EngineStatusSection()
+
+                    TryItCard(practiceText: $practiceText)
+
                     NavigationLink {
                         MyWordsView()
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "text.badge.plus")
-                                .font(.title2)
-                                .foregroundStyle(Color.accentColor)
-                            Text("My Words — add your own keys")
-                                .font(.title3)
+                        MyWordsNavCard()
+                    }
+                    .buttonStyle(.plain)
+
+                    VStack(spacing: 12) {
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 14) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    step(1, "Open Settings")
+                                    step(2, "General → Keyboard → Keyboards")
+                                    step(3, "Add New Keyboard…")
+                                    step(4, "Select Typikey")
+                                }
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Use it")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                    step(1, "Open any app with a text field (Notes, Messages)")
+                                    step(2, "Tap the text field, then hold the globe key")
+                                    step(3, "Select Typikey")
+                                }
+                            }
+                            .padding(.top, 10)
+                        } label: {
+                            Text("Set up the keyboard")
+                                .font(.headline)
+                                .foregroundStyle(.primary)
                         }
-                        .padding(.vertical, 10)
+                        .tint(.primary)
+                        .homeCardStyle()
+
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Label("A word grid, like TouchChat: one tap inserts one whole word. Categories switch pages at the top.", systemImage: "square.grid.3x3")
+                                Label("abc opens the letter keyboard — the fallback for words not in the grid, just like TouchChat's own.", systemImage: "keyboard")
+                                Label("Slide your finger across the keys — nothing happens until you lift. The key under your finger lights up.", systemImage: "hand.draw")
+                                Label("Accidental double-taps are ignored for half a second.", systemImage: "clock")
+                            }
+                            .padding(.top, 10)
+                        } label: {
+                            Text("How it types")
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                        }
+                        .tint(.primary)
+                        .homeCardStyle()
                     }
                 }
-                EngineStatusSection()
-                Section("How it types") {
-                    Label("A word grid, like TouchChat: one tap inserts one whole word. Categories switch pages at the top.", systemImage: "square.grid.3x3")
-                    Label("abc opens the letter keyboard — the fallback for words not in the grid, just like TouchChat's own.", systemImage: "keyboard")
-                    Label("Slide your finger across the keys — nothing happens until you lift. The key under your finger lights up.", systemImage: "hand.draw")
-                    Label("Accidental double-taps are ignored for half a second.", systemImage: "clock")
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
-            .navigationTitle("Typikey")
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
@@ -73,6 +93,116 @@ struct SetupView: View {
                 .background(Circle().fill(Color.accentColor.opacity(0.15)))
             Text(text)
         }
+    }
+}
+
+/// Shared card chrome for the home screen: a rounded, softly shaded
+/// surface on the system's secondary grouped background so it reads
+/// correctly in both light and dark mode.
+private extension View {
+    func homeCardStyle() -> some View {
+        padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+    }
+}
+
+/// App identity: the icon's 2x2 key-tile motif inline next to the name,
+/// compact enough to sit at the top of the scroll view without pushing
+/// the status card below the fold.
+private struct HeroHeader: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 14) {
+                KeyTileMotif()
+                    .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Typikey")
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    Text("The big-word keyboard")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Label("Large targets, built for people with limited fine motor control.", systemImage: "hand.point.up.braille")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 4)
+    }
+}
+
+/// The app icon's 2x2 rounded-tile grid, recreated inline with the exact
+/// Fitzgerald colors the keyboard's word-class palette uses (see
+/// `WordClass.color` in KeyboardViewController.swift): pronoun yellow,
+/// verb green, descriptor blue, noun orange.
+private struct KeyTileMotif: View {
+    private let yellow = Color(red: 1.00, green: 0.92, blue: 0.55)
+    private let green = Color(red: 0.72, green: 0.90, blue: 0.63)
+    private let blue = Color(red: 0.65, green: 0.82, blue: 0.98)
+    private let orange = Color(red: 1.00, green: 0.80, blue: 0.58)
+
+    var body: some View {
+        Grid(horizontalSpacing: 5, verticalSpacing: 5) {
+            GridRow {
+                tile(yellow)
+                tile(green)
+            }
+            GridRow {
+                tile(blue)
+                tile(orange)
+            }
+        }
+    }
+
+    private func tile(_ color: Color) -> some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(color)
+    }
+}
+
+private struct TryItCard: View {
+    @Binding var practiceText: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Try it here")
+                .font(.headline)
+            TextField("Tap here, hold the globe key, choose Typikey", text: $practiceText, axis: .vertical)
+                .font(.title3)
+                .lineLimit(4...8)
+                .frame(minHeight: 120, alignment: .topLeading)
+        }
+        .homeCardStyle()
+    }
+}
+
+private struct MyWordsNavCard: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "text.badge.plus")
+                .font(.title)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("My Words & Phrases")
+                    .font(.title3.weight(.semibold))
+                Text("Add your own keys to the keyboard's Mine page")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .homeCardStyle()
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -260,7 +390,9 @@ struct EngineStatusSection: View {
     @State private var probing = false
 
     var body: some View {
-        Section("Phrase completion") {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Phrase completion")
+                .font(.headline)
             Label(status, systemImage: statusSymbol)
             if let probeResult {
                 Label(probeResult, systemImage: "stopwatch")
@@ -268,6 +400,7 @@ struct EngineStatusSection: View {
             Button(probing ? "Generating…" : "Test generation") { runProbe() }
                 .disabled(probing || statusSymbol != "checkmark.circle")
         }
+        .homeCardStyle()
         .onAppear { checkAvailability() }
     }
 

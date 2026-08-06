@@ -12,11 +12,11 @@ final class MyWordsTests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let link = app.staticTexts["My Words — add your own keys"]
+        let link = app.staticTexts["My Words & Phrases"]
         if link.waitForExistence(timeout: 5) {
             link.tap()
         } else {
-            app.buttons["My Words — add your own keys"].tap()
+            app.buttons["My Words & Phrases"].tap()
         }
 
         let field = app.textFields["myWordsField"]
