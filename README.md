@@ -35,6 +35,9 @@ Every interaction decision traces to a specific research finding:
 - Recents learns his 12 most-used words automatically
 - Prediction bar above the grid, with the globe key fixed at its right end (same slot on every level and device) — next-word prediction is an on-device bigram model, seeded with defaults, learning his real word patterns over time
 - Phrase completion (iOS 26 devices with Apple Intelligence): the bar offers a short continuation in the user's own vocabulary — tap the phrase to take it all, or ▸ to take one word. Generated entirely on device; on unsupported devices the bar simply shows word prediction as before.
+- Keyword capture: words typed letter-by-letter three or more times become candidates in the app's My Words screen — accept one and it joins the keyboard's Mine category. Counts stay in the on-device store, nowhere else.
+- My Words: a tremor-friendly editor in the app (big buttons, two-tap remove, no drag-and-drop) feeding the Mine category through the shared container. Requires the Full Access grant to reach the keyboard.
+- Pointer hover: a trackpad, Apple Pencil, or AssistiveTouch pointer (joystick) highlights the key it is over before any click — explore-then-commit for pointer users.
 - Letter keyboard (large-key QWERTY) and numbers layer as fallback, with system spell-checker word completions
 - Word-level delete (one tap removes the whole last word)
 - Punctuation cells that attach to the preceding word

@@ -39,6 +39,20 @@ struct SetupView: View {
                     step(2, "Tap the text field, then hold the globe key")
                     step(3, "Select Typikey")
                 }
+                Section {
+                    NavigationLink {
+                        MyWordsView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "text.badge.plus")
+                                .font(.title2)
+                                .foregroundStyle(Color.accentColor)
+                            Text("My Words — add your own keys")
+                                .font(.title3)
+                        }
+                        .padding(.vertical, 10)
+                    }
+                }
                 EngineStatusSection()
                 Section("How it types") {
                     Label("A word grid, like TouchChat: one tap inserts one whole word. Categories switch pages at the top.", systemImage: "square.grid.3x3")
@@ -59,6 +73,180 @@ struct SetupView: View {
                 .background(Circle().fill(Color.accentColor.opacity(0.15)))
             Text(text)
         }
+    }
+}
+
+/// Tremor-friendly "My Words" editor (Gilbert build, task G2). Reads and
+/// writes the same shared-suite keys the keyboard extension owns
+/// (`myWords`, `captureCounts` — see Task G1): the app always has access
+/// to the app group, unlike the keyboard, which gates on Full Access.
+/// The keyboard picks up edits here on its next `viewWillAppear`.
+struct MyWordsView: View {
+    private let store: UserDefaults =
+        UserDefaults(suiteName: "group.com.asadullokh.ch5.typikey") ?? .standard
+
+    @State private var myWords: [String] = []
+    @State private var captureCounts: [String: Int] = [:]
+    @State private var armedWord: String?
+    @State private var newWord = ""
+
+    private var captureCandidates: [(word: String, count: Int)] {
+        captureCounts
+            .filter { $0.value >= 3 }
+            .filter { candidate in !myWords.contains { $0.caseInsensitiveCompare(candidate.key) == .orderedSame } }
+            .map { (word: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
+    }
+
+    var body: some View {
+        List {
+            if !captureCandidates.isEmpty {
+                Section("Words you type a lot") {
+                    ForEach(captureCandidates, id: \.word) { candidate in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(candidate.word)
+                                .font(.title2)
+                            Text("typed \(candidate.count) times")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 12) {
+                                Button {
+                                    addCapturedWord(candidate.word)
+                                } label: {
+                                    Text("Add")
+                                        .font(.title3.weight(.semibold))
+                                        .frame(maxWidth: .infinity, minHeight: 64)
+                                }
+                                .buttonStyle(.borderedProminent)
+
+                                Button {
+                                    skipCapturedWord(candidate.word)
+                                } label: {
+                                    Text("Skip")
+                                        .font(.title3.weight(.semibold))
+                                        .frame(maxWidth: .infinity, minHeight: 64)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                }
+            }
+
+            Section("My words and phrases") {
+                if myWords.isEmpty {
+                    Text("Words you add appear here, and on the keyboard's Mine page.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(myWords, id: \.self) { word in
+                    HStack {
+                        Text(word)
+                            .font(.title3)
+                            .accessibilityIdentifier(word)
+                        Spacer()
+                        Button {
+                            removeWord(word)
+                        } label: {
+                            Text(armedWord == word ? "Tap again" : "Remove")
+                                .font(.headline)
+                                .frame(minWidth: 130, minHeight: 52)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(armedWord == word ? .red : nil)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("Add a word or phrase…", text: $newWord)
+                        .font(.title2)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("myWordsField")
+                    Button {
+                        addManualWord()
+                    } label: {
+                        Text("Add")
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("myWordsAdd")
+                }
+                .padding(.vertical, 8)
+            }
+        }
+        .navigationTitle("My Words")
+        .onAppear(perform: reload)
+    }
+
+    private func reload() {
+        myWords = freshMyWords()
+        captureCounts = freshCaptureCounts()
+    }
+
+    /// Reads myWords straight from the shared suite — never from @State —
+    /// so a caller about to mutate and write back never clobbers a write
+    /// the keyboard extension made in between this screen's last reload
+    /// and now.
+    private func freshMyWords() -> [String] {
+        (store.array(forKey: "myWords") as? [String]) ?? []
+    }
+
+    private func freshCaptureCounts() -> [String: Int] {
+        (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
+    }
+
+    private func addCapturedWord(_ word: String) {
+        var words = freshMyWords()
+        if !words.contains(where: { $0.caseInsensitiveCompare(word) == .orderedSame }) {
+            words.append(word)
+            store.set(words, forKey: "myWords")
+        }
+        myWords = words
+
+        var counts = freshCaptureCounts()
+        counts.removeValue(forKey: word)
+        store.set(counts, forKey: "captureCounts")
+        captureCounts = counts
+    }
+
+    private func skipCapturedWord(_ word: String) {
+        var counts = freshCaptureCounts()
+        counts.removeValue(forKey: word)
+        store.set(counts, forKey: "captureCounts")
+        captureCounts = counts
+    }
+
+    private func removeWord(_ word: String) {
+        if armedWord == word {
+            var words = freshMyWords()
+            words.removeAll { $0.caseInsensitiveCompare(word) == .orderedSame }
+            store.set(words, forKey: "myWords")
+            myWords = words
+            armedWord = nil
+        } else {
+            armedWord = word
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                if armedWord == word { armedWord = nil }
+            }
+        }
+    }
+
+    private func addManualWord() {
+        let trimmed = newWord.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var words = freshMyWords()
+        guard !words.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) else {
+            myWords = words
+            newWord = ""
+            return
+        }
+        words.append(trimmed)
+        store.set(words, forKey: "myWords")
+        myWords = words
+        newWord = ""
     }
 }
 
