@@ -335,6 +335,13 @@ final class KeyboardViewController: UIInputViewController {
     // next time the keyboard shows.
     private var myWords: [String] = []
 
+    // Words recently OCR'd off the user's screen by the broadcast
+    // extension (screen learning). Read-only here; reaches this process
+    // through the app group, so it is empty without Full Access — and the
+    // keyboard must work identically either way (invariant 5). Context
+    // decays: a session older than 30 minutes stops influencing anything.
+    private var screenWords: [String: Int] = [:]
+
     // Accumulates the current letters-level word as it's typed one key at
     // a time; cleared on any terminator (space/return/punctuation/delete/
     // level change/field switch) so only real letter-by-letter typing is
@@ -385,6 +392,7 @@ final class KeyboardViewController: UIInputViewController {
         usageCounts = (store.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
         learnedBigrams = (store.dictionary(forKey: "bigrams") as? [String: Int]) ?? [:]
         myWords = (store.array(forKey: "myWords") as? [String]) ?? []
+        reloadScreenWords()
         if let saved = store.string(forKey: "lang"), let restored = Lang(rawValue: saved) {
             lang = restored
         }
@@ -440,6 +448,7 @@ final class KeyboardViewController: UIInputViewController {
         // fresh field both show up on this appearance, and so a stale
         // in-progress token from a previous field never leaks into a new one.
         myWords = (store.array(forKey: "myWords") as? [String]) ?? []
+        reloadScreenWords()
         typedToken = ""
         heightConstraint?.constant = requestedHeight
         let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
@@ -1329,6 +1338,18 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: Prediction (on-device only — no Full Access, no network)
 
+    /// Screen learning input: the broadcast extension's word-frequency
+    /// store, honored only while fresh. Without Full Access the key simply
+    /// never exists in `.standard` and this stays empty.
+    private func reloadScreenWords() {
+        let stamp = store.double(forKey: "screenWordsStamp")
+        guard stamp > 0, Date().timeIntervalSince1970 - stamp < 1800 else {
+            screenWords = [:]
+            return
+        }
+        screenWords = (store.dictionary(forKey: "screenWords") as? [String: Int]) ?? [:]
+    }
+
     /// Grid mode: predict likely next words from learned bigrams, seeded
     /// per language. Predictions appear in the suggestion bar so grid
     /// positions stay stable.
@@ -1343,6 +1364,12 @@ final class KeyboardViewController: UIInputViewController {
         for (i, word) in (seedBigrams[lang]?[prev] ?? []).enumerated() {
             scores[word, default: 0] += 3 - i
         }
+        // Screen context: words the user is looking at right now are
+        // likely in the reply. Weighted above the generic seeds but below
+        // any real learned bigram, so personal learning always wins.
+        for (word, count) in screenWords.sorted(by: { $0.value > $1.value }).prefix(15) {
+            scores[word, default: 0] += min(count, 4)
+        }
         return scores.sorted { $0.value > $1.value }.prefix(3).map(\.key)
     }
 
@@ -1351,9 +1378,10 @@ final class KeyboardViewController: UIInputViewController {
         // user's own words matter for completion regardless of how often
         // built-in vocabulary has been used.
         let ranked = usageCounts.sorted { $0.value > $1.value }.map(\.key)
+        let screenTop = screenWords.sorted { $0.value > $1.value }.prefix(10).map(\.key)
         var seen = Set<String>()
         var result: [String] = []
-        for word in myWords + ranked {
+        for word in myWords + screenTop + ranked {
             guard !seen.contains(word) else { continue }
             seen.insert(word)
             result.append(word)
@@ -1402,10 +1430,24 @@ final class KeyboardViewController: UIInputViewController {
         } else {
             let word = currentPartialWord()
             if word.count >= 2 {
+                // Screen-learned matches lead: a name or product word seen
+                // on screen won't be in the system dictionary at all, and
+                // that is exactly the word worth one tap instead of ten.
+                let lower = word.lowercased()
+                var slots = screenWords
+                    .filter { $0.key.hasPrefix(lower) && $0.key != lower }
+                    .sorted { $0.value > $1.value }
+                    .prefix(2)
+                    .map(\.key)
                 let checker = UITextChecker()
                 let range = NSRange(location: 0, length: word.utf16.count)
-                titles = Array((checker.completions(
-                    forPartialWordRange: range, in: word, language: lang.spellCheckCode) ?? []).prefix(3))
+                for completion in checker.completions(
+                    forPartialWordRange: range, in: word, language: lang.spellCheckCode) ?? [] {
+                    if !slots.contains(where: { $0.caseInsensitiveCompare(completion) == .orderedSame }) {
+                        slots.append(completion)
+                    }
+                }
+                titles = Array(slots.prefix(3))
             } else {
                 titles = []
             }

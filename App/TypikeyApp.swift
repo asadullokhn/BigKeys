@@ -1,4 +1,5 @@
 import SwiftUI
+import ReplayKit
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -31,6 +32,8 @@ struct SetupView: View {
                         MyWordsNavCard()
                     }
                     .buttonStyle(.plain)
+
+                    ScreenLearningCard()
 
                     VStack(spacing: 12) {
                         DisclosureGroup {
@@ -204,6 +207,80 @@ private struct MyWordsNavCard: View {
         .homeCardStyle()
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
+}
+
+/// Screen learning: starts/stops the TypikeyBroadcast upload extension via
+/// the system broadcast picker (the ONLY way iOS allows a broadcast to
+/// start — there is no programmatic start, and the system shows its own
+/// red recording indicator the whole time). While broadcasting, the
+/// extension OCRs throttled frames on-device and merges words into the
+/// app group's `screenWords`; the keyboard biases its suggestions toward
+/// them. Nothing ever leaves the device.
+private struct ScreenLearningCard: View {
+    private let store: UserDefaults =
+        UserDefaults(suiteName: "group.com.asadullokh.ch5.typikey") ?? .standard
+
+    @State private var learnedCount = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 16) {
+                BroadcastPickerButton()
+                    .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Learn from my screen")
+                        .font(.title3.weight(.semibold))
+                    Text("Tap the record button, then Start Broadcast")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Text("While it's on, Typikey reads the words on your screen and suggests them when you type — names, places, whatever you're replying to. Everything stays on this iPad; nothing is ever uploaded. iOS shows a red indicator the whole time, and you can stop from the same button or Control Center.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            if learnedCount > 0 {
+                HStack {
+                    Text("\(learnedCount) words learned from your screen")
+                        .font(.footnote.weight(.medium))
+                    Spacer(minLength: 12)
+                    Button("Forget them", role: .destructive) {
+                        store.removeObject(forKey: "screenWords")
+                        store.removeObject(forKey: "screenWordsStamp")
+                        learnedCount = 0
+                    }
+                    .font(.footnote.weight(.semibold))
+                }
+            }
+        }
+        .homeCardStyle()
+        .onAppear(perform: refresh)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            refresh()
+        }
+    }
+
+    private func refresh() {
+        learnedCount = (store.dictionary(forKey: "screenWords") as? [String: Int])?.count ?? 0
+    }
+}
+
+/// The system broadcast picker. Its internal button is the tap target;
+/// stretched to fill our frame so the target stays big.
+private struct BroadcastPickerButton: UIViewRepresentable {
+    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
+        let picker = RPSystemBroadcastPickerView()
+        picker.preferredExtension = "com.asadullokh.ch5.typikey.broadcast"
+        picker.showsMicrophoneButton = false
+        for case let button as UIButton in picker.subviews {
+            button.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        }
+        return picker
+    }
+
+    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
 }
 
 /// Tremor-friendly "My Words" editor (Gilbert build, task G2). Reads and

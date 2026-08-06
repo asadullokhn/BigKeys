@@ -38,6 +38,7 @@ Every interaction decision traces to a specific research finding:
 - Keyword capture: words typed letter-by-letter three or more times become candidates in the app's My Words screen — accept one and it joins the keyboard's Mine category. Counts stay in the on-device store, nowhere else.
 - My Words: a tremor-friendly editor in the app (big buttons, two-tap remove, no drag-and-drop) feeding the Mine category through the shared container. Requires the Full Access grant to reach the keyboard.
 - Pointer hover: a trackpad, Apple Pencil, or AssistiveTouch pointer (joystick) highlights the key it is over before any click — explore-then-commit for pointer users.
+- Screen learning (opt-in): the "Learn from my screen" card starts a system screen broadcast (red indicator, user-stoppable any time) that OCRs throttled frames on-device and remembers the words seen; the keyboard then suggests them while replying — names and topic words that no dictionary has. Word counts only, in the shared container; frames are never stored and nothing is ever uploaded.
 - Letter keyboard (large-key QWERTY) and numbers layer as fallback, with system spell-checker word completions
 - Word-level delete (one tap removes the whole last word)
 - Punctuation cells that attach to the preceding word

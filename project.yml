@@ -45,6 +45,8 @@ targets:
     dependencies:
       - target: TypikeyKeyboard
         embed: true
+      - target: TypikeyBroadcast
+        embed: true
   TypikeyUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -77,6 +79,34 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey.keyboard
     entitlements:
       path: Keyboard/TypikeyKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.asadullokh.ch5.typikey
+  TypikeyBroadcast:
+    type: app-extension
+    platform: iOS
+    sources: [Broadcast]
+    info:
+      path: Broadcast/Info.plist
+      properties:
+        CFBundleDisplayName: Typikey
+        ITSAppUsesNonExemptEncryption: false
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
+          # RPBroadcastProcessMode appears BOTH nested and as a direct
+          # child: Xcode's template nests it under NSExtensionAttributes,
+          # but App Store Connect's binary validator has been reported
+          # (devforums 804699) to want it directly under NSExtension.
+          # Both placements are harmless; either satisfies its reader.
+          RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+          NSExtensionAttributes:
+            RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey.broadcast
+    entitlements:
+      path: Broadcast/TypikeyBroadcast.entitlements
       properties:
         com.apple.security.application-groups:
           - group.com.asadullokh.ch5.typikey

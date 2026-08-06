@@ -7,11 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		279A952F2D8694A16DDE8465 /* ScreenLearningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C34EE826A9C2E88FA6D179E /* ScreenLearningTests.swift */; };
 		4F2971AAB04CB45F9F3A0D2B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */; };
 		591312BBAA426D1DE2ABB2BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 238704140C8DFC7E10D738C7 /* Assets.xcassets */; };
+		8DB6578CF757DE30411A8B1C /* TypikeyBroadcast.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FCCC334E9988B617A6DCEEFB /* TypikeyBroadcast.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9C862CD8CF1738B5038563A8 /* MyWordsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 167A2498198387A80DD85FC1 /* MyWordsTests.swift */; };
 		B9274BDBCA7F7A765DA6CCD7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */; };
 		BD72207B7019C86BCF8699CE /* CompletionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */; };
+		BD7FFEE284ED5DFC50FA2351 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86125954B46BC2FC71586B57 /* SampleHandler.swift */; };
 		C5DE9CF6E675B6572A25B3F0 /* KeyboardHeightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D977763A87F89006584A3902 /* KeyboardHeightTests.swift */; };
 		DE071B07D2A8FA05715A5ED8 /* TypikeyKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F83C0D6BAF2B10D4444DD9A7 /* TypikeyKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EED48B258A0595CE57451BAC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */; };
@@ -34,6 +37,13 @@
 			remoteGlobalIDString = CCEF7CBAD03CEB211650881C;
 			remoteInfo = TypikeyKeyboard;
 		};
+		C4081CF8FEC00FC8CAB55957 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CC0D6E7E0A5C16B3E176D3BA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F78E9B1D6D90A6BC2398D5AA;
+			remoteInfo = TypikeyBroadcast;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -44,6 +54,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				DE071B07D2A8FA05715A5ED8 /* TypikeyKeyboard.appex in Embed Foundation Extensions */,
+				8DB6578CF757DE30411A8B1C /* TypikeyBroadcast.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -52,21 +63,26 @@
 
 /* Begin PBXFileReference section */
 		167A2498198387A80DD85FC1 /* MyWordsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyWordsTests.swift; sourceTree = "<group>"; };
+		1C34EE826A9C2E88FA6D179E /* ScreenLearningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenLearningTests.swift; sourceTree = "<group>"; };
 		238704140C8DFC7E10D738C7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2F4B7442BDF523BAC5B0E4C2 /* PinnedFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedFrameTests.swift; sourceTree = "<group>"; };
 		540443137A743CBC5FFF53C0 /* Typikey.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Typikey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		671DF4A1D7A2DABAD334557F /* TypikeyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TypikeyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FA3846751FF38D84B3414E5 /* TypikeyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypikeyApp.swift; sourceTree = "<group>"; };
+		86125954B46BC2FC71586B57 /* SampleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHandler.swift; sourceTree = "<group>"; };
 		8A0596DADB8E2918F9CB0FF9 /* Typikey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Typikey.entitlements; sourceTree = "<group>"; };
 		8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
 		BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionEngine.swift; sourceTree = "<group>"; };
+		D6755D1E733576488ACF9B75 /* TypikeyBroadcast.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TypikeyBroadcast.entitlements; sourceTree = "<group>"; };
 		D977763A87F89006584A3902 /* KeyboardHeightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHeightTests.swift; sourceTree = "<group>"; };
 		DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		EA33C5A4EB0347311C38406D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		EC274687C47E96AD04FD45F5 /* TypikeyKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TypikeyKeyboard.entitlements; sourceTree = "<group>"; };
 		F14E0151DBA04E506C934CB8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F6AB8DF9F06A51C18A94A9DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F83C0D6BAF2B10D4444DD9A7 /* TypikeyKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TypikeyKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		FCCC334E9988B617A6DCEEFB /* TypikeyBroadcast.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TypikeyBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -74,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				A2508DCB118A6D799FE05AD5 /* App */,
+				AC6CEC8EAA5A0161C427CC57 /* Broadcast */,
 				BC0B541BBA06AE32F05B7232 /* Keyboard */,
 				AF67B2AFBC51848C7E1E95BB /* UITests */,
 				68B8D075CD1C91BAE90CA312 /* Products */,
@@ -84,6 +101,7 @@
 			isa = PBXGroup;
 			children = (
 				540443137A743CBC5FFF53C0 /* Typikey.app */,
+				FCCC334E9988B617A6DCEEFB /* TypikeyBroadcast.appex */,
 				F83C0D6BAF2B10D4444DD9A7 /* TypikeyKeyboard.appex */,
 				671DF4A1D7A2DABAD334557F /* TypikeyUITests.xctest */,
 			);
@@ -102,12 +120,23 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		AC6CEC8EAA5A0161C427CC57 /* Broadcast */ = {
+			isa = PBXGroup;
+			children = (
+				EA33C5A4EB0347311C38406D /* Info.plist */,
+				86125954B46BC2FC71586B57 /* SampleHandler.swift */,
+				D6755D1E733576488ACF9B75 /* TypikeyBroadcast.entitlements */,
+			);
+			path = Broadcast;
+			sourceTree = "<group>";
+		};
 		AF67B2AFBC51848C7E1E95BB /* UITests */ = {
 			isa = PBXGroup;
 			children = (
 				D977763A87F89006584A3902 /* KeyboardHeightTests.swift */,
 				167A2498198387A80DD85FC1 /* MyWordsTests.swift */,
 				2F4B7442BDF523BAC5B0E4C2 /* PinnedFrameTests.swift */,
+				1C34EE826A9C2E88FA6D179E /* ScreenLearningTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -157,6 +186,7 @@
 			);
 			dependencies = (
 				DB3323C52A3EE839EBBEA193 /* PBXTargetDependency */,
+				4F79E66763B0B1F9CA1DD90E /* PBXTargetDependency */,
 			);
 			name = Typikey;
 			packageProductDependencies = (
@@ -183,6 +213,23 @@
 			productReference = F83C0D6BAF2B10D4444DD9A7 /* TypikeyKeyboard.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		F78E9B1D6D90A6BC2398D5AA /* TypikeyBroadcast */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2D7E954419EC9F2D9FF2021C /* Build configuration list for PBXNativeTarget "TypikeyBroadcast" */;
+			buildPhases = (
+				42A9198DF0CB58D42E4CCAD1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TypikeyBroadcast;
+			packageProductDependencies = (
+			);
+			productName = TypikeyBroadcast;
+			productReference = FCCC334E9988B617A6DCEEFB /* TypikeyBroadcast.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -205,6 +252,10 @@
 						DevelopmentTeam = Y7ZZ5G2T3Y;
 						ProvisioningStyle = Automatic;
 					};
+					F78E9B1D6D90A6BC2398D5AA = {
+						DevelopmentTeam = Y7ZZ5G2T3Y;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 02DBA6C775AAFDFD22E9229C /* Build configuration list for PBXProject "Typikey" */;
@@ -222,6 +273,7 @@
 			projectRoot = "";
 			targets = (
 				A2467DEA23AE29F71CEEEA5D /* Typikey */,
+				F78E9B1D6D90A6BC2398D5AA /* TypikeyBroadcast */,
 				CCEF7CBAD03CEB211650881C /* TypikeyKeyboard */,
 				00E59903FECC2CA8D9F86ED3 /* TypikeyUITests */,
 			);
@@ -257,6 +309,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		42A9198DF0CB58D42E4CCAD1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BD7FFEE284ED5DFC50FA2351 /* SampleHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7DC15828AD69BEC093FF6E81 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -273,6 +333,7 @@
 				C5DE9CF6E675B6572A25B3F0 /* KeyboardHeightTests.swift in Sources */,
 				9C862CD8CF1738B5038563A8 /* MyWordsTests.swift in Sources */,
 				FB44BAC1AC5A3F6C433CD88D /* PinnedFrameTests.swift in Sources */,
+				279A952F2D8694A16DDE8465 /* ScreenLearningTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,6 +345,11 @@
 			target = A2467DEA23AE29F71CEEEA5D /* Typikey */;
 			targetProxy = 463F4E42D90AF0B975DD1C4B /* PBXContainerItemProxy */;
 		};
+		4F79E66763B0B1F9CA1DD90E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F78E9B1D6D90A6BC2398D5AA /* TypikeyBroadcast */;
+			targetProxy = C4081CF8FEC00FC8CAB55957 /* PBXContainerItemProxy */;
+		};
 		DB3323C52A3EE839EBBEA193 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = CCEF7CBAD03CEB211650881C /* TypikeyKeyboard */;
@@ -292,6 +358,22 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0461F04495E1534D3B911949 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Broadcast/TypikeyBroadcast.entitlements;
+				INFOPLIST_FILE = Broadcast/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.asadullokh.ch5.typikey.broadcast;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		177D7D6224698C855BE123B7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -305,6 +387,22 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Typikey;
+			};
+			name = Release;
+		};
+		24DC94957BA6C1936359A400 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Broadcast/TypikeyBroadcast.entitlements;
+				INFOPLIST_FILE = Broadcast/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.asadullokh.ch5.typikey.broadcast;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -540,6 +638,15 @@
 			buildConfigurations = (
 				F237E297DE027F379BC3B799 /* Debug */,
 				6CF8779210D69E792A66A73E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2D7E954419EC9F2D9FF2021C /* Build configuration list for PBXNativeTarget "TypikeyBroadcast" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0461F04495E1534D3B911949 /* Debug */,
+				24DC94957BA6C1936359A400 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
