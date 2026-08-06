@@ -1,6 +1,6 @@
 # Typikey
 
-(Repo codename: BigKeys.) A TouchChat-style iPadOS keyboard extension for people with limited fine motor control. Built by Ali, Artem, and Keiko for Apple Developer Academy Challenge 5, inspired by our community: The Inclusive Pair (Muhammad Sayfullah and Siti Fadillah, Singapore-based AAC advocates).
+A TouchChat-style iPadOS keyboard extension for people with limited fine motor control. Built by Ali, Artem, and Keiko for Apple Developer Academy Challenge 5, inspired by our community: The Inclusive Pair (Muhammad Sayfullah and Siti Fadillah, Singapore-based AAC advocates).
 
 ## The problem
 
