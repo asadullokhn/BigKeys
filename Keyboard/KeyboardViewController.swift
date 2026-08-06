@@ -783,15 +783,21 @@ final class KeyboardViewController: UIInputViewController {
             if words.isEmpty {
                 // Mine's empty state isn't Recents' "used often" story —
                 // same English hint in both languages (invariant 8: no new
-                // Malay strings).
-                let isMine = index < categories.count && categories[index].name == "Mine"
+                // Malay strings). Mine is always the last category
+                // allCategories() appends, so that's the robust way to
+                // detect it — never a name string match.
+                let isMine = index == categories.count - 1
                 let hint = isMine
                     ? "Add words in the Typikey app"
                     : (lang == .ms
                         ? "Perkataan yang kerap digunakan akan muncul di sini"
                         : "Words you use often will appear here")
+                // Recents' hint jumps to Core (toWords(1)) since its text
+                // points there; Mine's hint has nowhere in particular to
+                // jump to, so it just backs out to the category picker.
+                let hintAction: KeyAction = isMine ? .toCategories : .toWords(1)
                 var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
-                rows[0][0] = ContentCell(.toWords(1), hint, colSpan: cols)
+                rows[0][0] = ContentCell(hintAction, hint, colSpan: cols)
                 return rows
             }
             let cells: [ContentCell?] = words.map { Optional(wordCell($0)) }
@@ -916,6 +922,9 @@ final class KeyboardViewController: UIInputViewController {
             label.textColor = .label
         } else if case .word(let w) = action, let word = vocabIndex[w] {
             label.backgroundColor = word.wordClass.color
+            label.textColor = .black
+        } else if case .word(let w) = action, myWords.contains(where: { $0.caseInsensitiveCompare(w) == .orderedSame }) {
+            label.backgroundColor = WordClass.social.color
             label.textColor = .black
         } else if case .punct = action {
             label.backgroundColor = WordClass.punct.color

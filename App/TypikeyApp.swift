@@ -134,7 +134,7 @@ struct MyWordsView: View {
                 }
             }
 
-            Section("My Words") {
+            Section("My words and phrases") {
                 if myWords.isEmpty {
                     Text("Words you add appear here, and on the keyboard's Mine page.")
                         .foregroundStyle(.secondary)
@@ -159,7 +159,7 @@ struct MyWordsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    TextField("Add a word", text: $newWord)
+                    TextField("Add a word or phrase…", text: $newWord)
                         .font(.title2)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -167,7 +167,7 @@ struct MyWordsView: View {
                     Button {
                         addManualWord()
                     } label: {
-                        Text("Add word")
+                        Text("Add")
                             .font(.title3.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 52)
                     }
