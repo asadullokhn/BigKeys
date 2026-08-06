@@ -1114,7 +1114,11 @@ final class KeyboardViewController: UIInputViewController {
             terminateToken()
             insertPunctuation(p)
         case .char(let c):
-            if let ch = c.first, c.count == 1, ch.isLetter {
+            // An apostrophe is token-internal (so "don't" accumulates as
+            // one token) even though it isn't a letter — terminateToken's
+            // ≥3 requirement below counts letters only, so it doesn't
+            // inflate the count, but the stored/counted key keeps it.
+            if let ch = c.first, c.count == 1, ch.isLetter || ch == "'" || ch == "\u{2019}" {
                 typedToken += c.lowercased()
             } else {
                 terminateToken()
@@ -1292,13 +1296,18 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Capture (Task G1 — letters-level typing, not grid-cell taps)
 
     /// Ends the current typed token — called on a terminator (space,
-    /// return, grid punctuation, or a non-letter char). Counts it as a
-    /// capture candidate when it's ≥3 letters and not already known;
-    /// always clears the accumulator either way.
+    /// return, grid punctuation, or a non-letter/non-apostrophe char).
+    /// Counts it as a capture candidate when it has ≥3 letters (the
+    /// apostrophe in a contraction like "don't" doesn't count toward
+    /// that minimum, but stays in the stored/counted key) and isn't
+    /// already known; always clears the accumulator either way.
     private func terminateToken() {
         let token = typedToken
         typedToken = ""
-        guard token.count >= 3, token.allSatisfy(\.isLetter), !isKnownWord(token) else { return }
+        let letterCount = token.filter(\.isLetter).count
+        guard letterCount >= 3,
+              token.allSatisfy({ $0.isLetter || $0 == "'" || $0 == "\u{2019}" }),
+              !isKnownWord(token) else { return }
         // Structured fields (email/URL/search) yield fragments like
         // "gmail" or "com" that are never real vocabulary — skip counting,
         // typing still works normally either way.

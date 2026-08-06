@@ -182,28 +182,49 @@ struct MyWordsView: View {
     }
 
     private func reload() {
-        myWords = (store.array(forKey: "myWords") as? [String]) ?? []
-        captureCounts = (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
+        myWords = freshMyWords()
+        captureCounts = freshCaptureCounts()
+    }
+
+    /// Reads myWords straight from the shared suite — never from @State —
+    /// so a caller about to mutate and write back never clobbers a write
+    /// the keyboard extension made in between this screen's last reload
+    /// and now.
+    private func freshMyWords() -> [String] {
+        (store.array(forKey: "myWords") as? [String]) ?? []
+    }
+
+    private func freshCaptureCounts() -> [String: Int] {
+        (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
     }
 
     private func addCapturedWord(_ word: String) {
-        if !myWords.contains(where: { $0.caseInsensitiveCompare(word) == .orderedSame }) {
-            myWords.append(word)
-            store.set(myWords, forKey: "myWords")
+        var words = freshMyWords()
+        if !words.contains(where: { $0.caseInsensitiveCompare(word) == .orderedSame }) {
+            words.append(word)
+            store.set(words, forKey: "myWords")
         }
-        captureCounts.removeValue(forKey: word)
-        store.set(captureCounts, forKey: "captureCounts")
+        myWords = words
+
+        var counts = freshCaptureCounts()
+        counts.removeValue(forKey: word)
+        store.set(counts, forKey: "captureCounts")
+        captureCounts = counts
     }
 
     private func skipCapturedWord(_ word: String) {
-        captureCounts.removeValue(forKey: word)
-        store.set(captureCounts, forKey: "captureCounts")
+        var counts = freshCaptureCounts()
+        counts.removeValue(forKey: word)
+        store.set(counts, forKey: "captureCounts")
+        captureCounts = counts
     }
 
     private func removeWord(_ word: String) {
         if armedWord == word {
-            myWords.removeAll { $0.caseInsensitiveCompare(word) == .orderedSame }
-            store.set(myWords, forKey: "myWords")
+            var words = freshMyWords()
+            words.removeAll { $0.caseInsensitiveCompare(word) == .orderedSame }
+            store.set(words, forKey: "myWords")
+            myWords = words
             armedWord = nil
         } else {
             armedWord = word
@@ -216,12 +237,15 @@ struct MyWordsView: View {
     private func addManualWord() {
         let trimmed = newWord.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        guard !myWords.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) else {
+        var words = freshMyWords()
+        guard !words.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) else {
+            myWords = words
             newWord = ""
             return
         }
-        myWords.append(trimmed)
-        store.set(myWords, forKey: "myWords")
+        words.append(trimmed)
+        store.set(words, forKey: "myWords")
+        myWords = words
         newWord = ""
     }
 }
