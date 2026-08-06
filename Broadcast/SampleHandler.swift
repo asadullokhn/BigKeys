@@ -43,7 +43,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .fast           // on-device, cheapest pass
         request.usesLanguageCorrection = false     // raw tokens, not autocorrect
-        request.recognitionLanguages = ["en-US"]
+        request.automaticallyDetectsLanguage = true // read the screen in whatever language it's in
         return request
     }()
 
@@ -79,8 +79,12 @@ final class SampleHandler: RPBroadcastSampleHandler {
     private func harvest() {
         var frameWords: Set<String> = []
         for observation in textRequest.results ?? [] {
-            guard let line = observation.topCandidates(1).first?.string else { continue }
-            for token in Self.tokens(in: line) {
+            // Confidence floor: garbled low-confidence OCR is the #1
+            // context polluter — a wrong word suggested later is worse
+            // than a missed one.
+            guard let candidate = observation.topCandidates(1).first,
+                  candidate.confidence >= 0.3 else { continue }
+            for token in Self.tokens(in: candidate.string) {
                 frameWords.insert(token)
             }
         }
@@ -112,6 +116,10 @@ final class SampleHandler: RPBroadcastSampleHandler {
             .filter { token in
                 token.count >= 3 && token.count <= 24
                     && token.rangeOfCharacter(from: .letters) != nil
+                    // Digit-substitution artifacts ("he11o", "0ffice") are a
+                    // classic OCR corruption — real words with digits are
+                    // rare enough that dropping them all is the safer trade.
+                    && token.rangeOfCharacter(from: .decimalDigits) == nil
                     && !stopwords.contains(token)
             }
     }

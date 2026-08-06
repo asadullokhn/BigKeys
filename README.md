@@ -42,12 +42,15 @@ Every interaction decision traces to a specific research finding:
 - Letter keyboard (large-key QWERTY) and numbers layer as fallback, with system spell-checker word completions
 - Word-level delete (one tap removes the whole last word)
 - Punctuation cells that attach to the preceding word
-- Two languages: English and Malay (Bahasa Melayu), toggled by the EN/MS key. Language switching relabels cells in place — grid positions never move, so muscle memory survives the switch. Prediction seeds, category names, and spell-check completions all follow the active language. Malay translations are drafts pending verification with Fadillah
+- Two grid languages: English and Malay (Bahasa Melayu), toggled by the EN/MS key. Language switching relabels cells in place — grid positions never move, so muscle memory survives the switch. Prediction seeds and category names follow the active language. Malay translations are drafts pending verification with Fadillah
+- Typing follows the text, not the toggle: letters-level word completions detect the language of what's actually in the field (any language the system spell-checker knows) and complete in it; phrase completion answers in the language the sentence is written in; screen learning OCRs whatever language is on screen. No setting to flip — it just works
 - Three height presets cycled by the size key, persisted between sessions
 - Dismiss key, like Apple's iPad keyboard
 - Field-type intent mapping: the keyboard opens on the level that matches the focused field (e.g. a search field opens on letters, a numeric field opens on numbers) — applied once per field, never mid-typing; manual navigation always wins afterward
 - Key-commit feedback: every committed tap plays the system input click and a light haptic impulse
 - Responsive layout: word boards drop to a compact 5-column content grid when the system narrows the keyboard (floating, Split View, Slide Over); the letters and numbers levels keep all 10 columns so no character goes missing. Pinned columns never change width or position, at any width
+- iPhone: the same keyboard, smaller — phone-sized height presets, and compact word boards run 8 content rows so ALL 40 cells stay reachable (the pinned control columns keep their 4-row frames). Categories become two banks of five full-height tiles
+- Auto-filing (Gilbert build): a word added to My Words that is recognizably a person, place, or action ALSO appears at the end of that category's page, in Mine's pink so it always reads as "his word" — the board configures itself, visibly, so nobody hunts for a word. Detection is on-device NLTagger; ambiguous words stay Mine-only; the My Words screen says where each word was filed
 - All learning (usage counts, bigrams) stays on-device: in the shared app-group container when Full Access is granted (so the app can read it), in the keyboard's own sandbox when not — never on a network
 
 ## Project structure

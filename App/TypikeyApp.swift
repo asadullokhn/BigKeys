@@ -1,5 +1,6 @@
 import SwiftUI
 import ReplayKit
+import NaturalLanguage
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -348,9 +349,16 @@ struct MyWordsView: View {
                 }
                 ForEach(myWords, id: \.self) { word in
                     HStack {
-                        Text(word)
-                            .font(.title3)
-                            .accessibilityIdentifier(word)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(word)
+                                .font(.title3)
+                                .accessibilityIdentifier(word)
+                            if let category = Self.autoCategory(for: word) {
+                                Text("Also on the \(category) page")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         Spacer()
                         Button {
                             removeWord(word)
@@ -403,6 +411,26 @@ struct MyWordsView: View {
 
     private func freshCaptureCounts() -> [String: Int] {
         (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
+    }
+
+    /// Mirrors the keyboard's auto-filing (person -> People, place ->
+    /// Places, verb -> Actions) so this screen can SAY where a word was
+    /// filed — the filing must be visible, never something to hunt for.
+    static func autoCategory(for word: String) -> String? {
+        guard word.rangeOfCharacter(from: .whitespaces) == nil else { return nil }
+        let text = word.capitalized
+        let tagger = NLTagger(tagSchemes: [.nameType, .lexicalClass])
+        tagger.string = text
+        let (nameTag, _) = tagger.tag(at: text.startIndex, unit: .word, scheme: .nameType)
+        switch nameTag {
+        case .some(.personalName): return "People"
+        case .some(.placeName): return "Places"
+        default:
+            let lower = word.lowercased()
+            tagger.string = lower
+            let (classTag, _) = tagger.tag(at: lower.startIndex, unit: .word, scheme: .lexicalClass)
+            return classTag == .verb ? "Actions" : nil
+        }
     }
 
     private func addCapturedWord(_ word: String) {

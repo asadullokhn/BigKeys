@@ -104,9 +104,10 @@ final class CompletionEngine {
         let voice = vocabulary.prefix(40).joined(separator: ", ")
         let snippet = String(context.suffix(200))
         let prompt = """
-        Continue the user's sentence naturally. Answer with at most 5 words, \
-        plain text only, no punctuation unless it ends the sentence. Match the \
-        user's simple, direct style. Words this user often uses: \(voice).
+        Continue the user's sentence naturally, in the same language the \
+        sentence is written in. Answer with at most 5 words, plain text only, \
+        no punctuation unless it ends the sentence. Match the user's simple, \
+        direct style. Words this user often uses: \(voice).
         Sentence so far: \(snippet)
         """
 

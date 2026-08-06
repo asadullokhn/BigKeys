@@ -1,4 +1,5 @@
 import UIKit
+import NaturalLanguage
 
 // MVP keyboard for limited fine motor control, modeled on the TouchChat
 // interface the user already trusts: a color-coded word grid with category
@@ -255,7 +256,11 @@ final class KeyboardViewController: UIInputViewController {
     // minimize behavior. Layout is fully width-responsive on top: when the
     // system narrows us (floating, Split View, Slide Over, Stage Manager)
     // the grid drops to compact mode instead of breaking.
-    private let sizePresets: [CGFloat] = [280, 360, 440]
+    // Same three-preset cycle on both device families; the phone numbers
+    // are smaller because an iPad preset would swallow an iPhone screen.
+    private var sizePresets: [CGFloat] {
+        UIDevice.current.userInterfaceIdiom == .phone ? [260, 310, 360] : [280, 360, 440]
+    }
     private var sizeIndex = 2
     private var heightConstraint: NSLayoutConstraint?
     private var healAttempts = 0
@@ -268,9 +273,14 @@ final class KeyboardViewController: UIInputViewController {
     // third-party keyboards). heightDeficit accumulates the measured
     // shortfall so the REQUEST compensates for it; requestedHeight is
     // what we ask the constraint for everywhere we used to ask for the
-    // raw preset. Capped at 160 so it can never runaway.
+    // raw preset. Capped at 160 so it can never runaway. The whole request
+    // is additionally clamped to 60% of the screen so a preset tuned for
+    // portrait can never bury the app in iPhone landscape.
     private var heightDeficit: CGFloat = 0
-    private var requestedHeight: CGFloat { sizePresets[sizeIndex] + heightDeficit }
+    private var requestedHeight: CGFloat {
+        let screenHeight = (view.window?.screen ?? UIScreen.main).bounds.height
+        return min(sizePresets[sizeIndex] + heightDeficit, screenHeight * 0.6)
+    }
 
     private var isCompact: Bool {
         view.bounds.width > 0 && view.bounds.width < 500
@@ -287,6 +297,7 @@ final class KeyboardViewController: UIInputViewController {
     private var pendingHeightFix = false
 
     private var keys: [Key] = []
+    private var contentRowCount = 4
     private var level: Level = .home
     private var clearArmedAt: Date?
     private var lastIntentSignature: String?
@@ -523,7 +534,12 @@ final class KeyboardViewController: UIInputViewController {
         // never decays on its own, so measuring a compact-mode grant here
         // would let a float episode pin the deficit at the 160pt cap and
         // then inflate the docked, full-width keyboard afterward.
-        if !isRotating, !isCompact, let constraint = heightConstraint, view.bounds.height > 0,
+        // Pad-only: the reserved band this compensates for is an iPadOS 26
+        // behavior. On a phone the only wide layout is landscape, where a
+        // grant below the (screen-clamped) request is normal — learning it
+        // as a deficit would leak extra height back into portrait.
+        if !isRotating, !isCompact, UIDevice.current.userInterfaceIdiom == .pad,
+           let constraint = heightConstraint, view.bounds.height > 0,
            view.bounds.height < constraint.constant - 1 {
             let deficit = min(constraint.constant - view.bounds.height, 160)
             if deficit > heightDeficit {
@@ -584,7 +600,49 @@ final class KeyboardViewController: UIInputViewController {
         // (invariant 1). Plain-text cells built on the fly; myWords are
         // never added to vocabIndex (that stays the built-in lookup only).
         let mineWords = myWords.map { VocabWord($0, .social) }
-        return [(recentsName, unique)] + vocabulary.map { ($0.name(lang), $0.words) } + [("Mine", mineWords)]
+        // Auto-filing (Gilbert: the board should quietly configure itself,
+        // but visibly, so nobody hunts for a word): a user's word that is
+        // recognizably a person, place, or action ALSO appears at the end
+        // of that category's page (invariant 1: new words go at the end),
+        // in Mine's pink so it always reads as "his word". Everything
+        // still lives in Mine regardless; ambiguous words stay Mine-only.
+        var builtIn = vocabulary.map { (name: $0.name(lang), en: $0.en, words: $0.words) }
+        for word in myWords {
+            guard let target = autoCategory(for: word),
+                  let i = builtIn.firstIndex(where: { $0.en == target }),
+                  !builtIn[i].words.contains(where: { $0.en.caseInsensitiveCompare(word) == .orderedSame })
+            else { continue }
+            builtIn[i].words.append(VocabWord(word, .social))
+        }
+        return [(recentsName, unique)] + builtIn.map { ($0.name, $0.words) } + [("Mine", mineWords)]
+    }
+
+    /// On-device semantic filing for a user's word: personal names go to
+    /// People, place names to Places, verbs to Actions. Single words only —
+    /// phrases stay Mine-only. Cached: NLTagger per word per keystroke
+    /// would be wasteful, and a word's reading never changes.
+    private var autoFileCache: [String: String?] = [:]
+
+    private func autoCategory(for word: String) -> String? {
+        if let cached = autoFileCache[word] { return cached }
+        var result: String?
+        if word.rangeOfCharacter(from: .whitespaces) == nil {
+            let text = word.capitalized // name recognition needs the capital
+            let tagger = NLTagger(tagSchemes: [.nameType, .lexicalClass])
+            tagger.string = text
+            let (nameTag, _) = tagger.tag(at: text.startIndex, unit: .word, scheme: .nameType)
+            switch nameTag {
+            case .some(.personalName): result = "People"
+            case .some(.placeName): result = "Places"
+            default:
+                let lower = word.lowercased()
+                tagger.string = lower
+                let (classTag, _) = tagger.tag(at: lower.startIndex, unit: .word, scheme: .lexicalClass)
+                if classTag == .verb { result = "Actions" }
+            }
+        }
+        autoFileCache[word] = result
+        return result
     }
 
     // MARK: Frame (spec: pinned columns identical on every level)
@@ -763,7 +821,7 @@ final class KeyboardViewController: UIInputViewController {
                 ContentCell(.size, "⤢"),
             ]
             cells += homeWords.map { Optional(wordCell($0)) }
-            return chunk(cells, into: cols)
+            return chunk(cells, into: cols, maxRows: wordBoardMaxRows)
         case .categories:
             if cols >= 10 {
                 // Big targets suit the AAC use case: tile the full content
@@ -778,8 +836,17 @@ final class KeyboardViewController: UIInputViewController {
                     rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
                 }
                 return rows
+            } else if wordBoardMaxRows == 8 {
+                // Phone: two banks of five full-height tiles — all 10
+                // categories with targets as big as the 8-row board allows.
+                var rows: [[ContentCell?]] = Array(
+                    repeating: Array(repeating: nil, count: cols), count: 8)
+                for (i, category) in allCategories().prefix(10).enumerated() {
+                    rows[(i / 5) * 4][i % 5] = ContentCell(.toWords(i), category.name, rowSpan: 4)
+                }
+                return rows
             } else {
-                // Compact: plain single cells, chunked like word boards.
+                // iPad compact (floating / Split View): plain single cells.
                 let categories = allCategories()
                 let cells: [ContentCell?] = categories.enumerated().map { (i, category) in
                     ContentCell(.toWords(i), category.name)
@@ -810,7 +877,7 @@ final class KeyboardViewController: UIInputViewController {
                 return rows
             }
             let cells: [ContentCell?] = words.map { Optional(wordCell($0)) }
-            return chunk(cells, into: cols)
+            return chunk(cells, into: cols, maxRows: wordBoardMaxRows)
         case .letters:
             var rows: [[ContentCell?]] = [
                 "qwertyuiop".map { Optional(ContentCell(.char(String($0)), String($0))) },
@@ -836,18 +903,26 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// Pack cells row-major into exactly 4 rows of `cols`, padding with nil.
-    private func chunk(_ cells: [ContentCell?], into cols: Int) -> [[ContentCell?]] {
+    /// Pack cells row-major into at least 4 and at most `maxRows` rows of
+    /// `cols`, padding with nil. Word boards pass 8 on phones so ALL cells
+    /// stay reachable in the 5-column grid — a phone is not an occasional
+    /// squeeze like Split View, it's the whole device.
+    private func chunk(_ cells: [ContentCell?], into cols: Int, maxRows: Int = 4) -> [[ContentCell?]] {
         var rows: [[ContentCell?]] = []
         for start in stride(from: 0, to: cells.count, by: cols) {
             rows.append(Array(cells[start..<min(start + cols, cells.count)]))
         }
         while rows.count < 4 { rows.append([]) }
-        rows = Array(rows.prefix(4))
+        rows = Array(rows.prefix(maxRows))
         for i in rows.indices where rows[i].count < cols {
             rows[i] += Array(repeating: nil, count: cols - rows[i].count)
         }
         return rows
+    }
+
+    /// 8 content rows for word boards on a compact phone, 4 everywhere else.
+    private var wordBoardMaxRows: Int {
+        UIDevice.current.userInterfaceIdiom == .phone && isCompact ? 8 : 4
     }
 
     // MARK: Building
@@ -879,15 +954,21 @@ final class KeyboardViewController: UIInputViewController {
         globeButton = nil
 
         let content = contentRows(for: level)
+        contentRowCount = content.count
 
+        // Pinned columns are ALWAYS 4 rows (invariant 9) even when the
+        // content grid runs 8 rows on a phone — layoutKeys() gives the two
+        // grids independent row heights.
         for row in 0..<4 {
             addKey(leftColumn[row], row: row, col: 0)
-            for (i, cell) in content[row].enumerated() {
+            addKey(rightColumn[row], row: row, col: contentColumns + 1)
+        }
+        for (row, cells) in content.enumerated() {
+            for (i, cell) in cells.enumerated() {
                 if let cell {
                     addKey((cell.action, cell.label), row: row, col: i + 1, colSpan: cell.colSpan, rowSpan: cell.rowSpan)
                 }
             }
-            addKey(rightColumn[row], row: row, col: contentColumns + 1)
         }
 
         // The globe lives in the top suggestion bar (same slot on every
@@ -1037,24 +1118,32 @@ final class KeyboardViewController: UIInputViewController {
         let pinnedW = bounds.width / 12
         let contentW = (bounds.width - 2 * pinnedW) / CGFloat(contentColumns)
         let gridTop = yOffset + topBarHeight
-        let rowH = (fullBounds.height - gridTop) / 4
+        // Pinned columns always divide the band into 4 (invariant 9: their
+        // frames never depend on the content grid); the content grid rows
+        // can be 8 on a phone.
+        let pinnedRowH = (fullBounds.height - gridTop) / 4
+        let contentRowH = (fullBounds.height - gridTop) / CGFloat(max(contentRowCount, 4))
         // A transient sub-topBarHeight container (before the height
         // compensation above lands) would otherwise yield negative
         // frames here — bail rather than draw them.
-        guard rowH > 0 else { return }
+        guard pinnedRowH > 0 else { return }
 
         for key in keys {
             let x: CGFloat
             let width: CGFloat
+            let rowH: CGFloat
             if key.col == 0 {
                 x = 0
                 width = pinnedW
+                rowH = pinnedRowH
             } else if key.col == contentColumns + 1 {
                 x = bounds.width - pinnedW
                 width = pinnedW
+                rowH = pinnedRowH
             } else {
                 x = pinnedW + CGFloat(key.col - 1) * contentW
                 width = contentW * CGFloat(key.colSpan)
+                rowH = contentRowH
             }
             key.view.frame = CGRect(
                 x: x + 3,
@@ -1338,6 +1427,26 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: Prediction (on-device only — no Full Access, no network)
 
+    /// The spell-check languages this system offers, resolved once.
+    private static let checkerLanguages = UITextChecker.availableLanguages
+
+    /// The language the user is ACTUALLY typing, detected from the field's
+    /// own text — completions follow the text, not a settings toggle
+    /// (Cotypist's "it just works in any language" feel). Falls back to
+    /// the manual EN/MS toggle on short or ambiguous context, so nothing
+    /// changes for a user who never leaves one language.
+    private func completionLanguage() -> String {
+        let sample = String((textDocumentProxy.documentContextBeforeInput ?? "").suffix(200))
+        guard sample.count >= 12 else { return lang.spellCheckCode }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(sample)
+        guard let detected = recognizer.dominantLanguage,
+              (recognizer.languageHypotheses(withMaximum: 1)[detected] ?? 0) > 0.7,
+              let match = Self.checkerLanguages.first(where: { $0.hasPrefix(detected.rawValue) })
+        else { return lang.spellCheckCode }
+        return match
+    }
+
     /// Screen learning input: the broadcast extension's word-frequency
     /// store, honored only while fresh. Without Full Access the key simply
     /// never exists in `.standard` and this stays empty.
@@ -1442,7 +1551,7 @@ final class KeyboardViewController: UIInputViewController {
                 let checker = UITextChecker()
                 let range = NSRange(location: 0, length: word.utf16.count)
                 for completion in checker.completions(
-                    forPartialWordRange: range, in: word, language: lang.spellCheckCode) ?? [] {
+                    forPartialWordRange: range, in: word, language: completionLanguage()) ?? [] {
                     if !slots.contains(where: { $0.caseInsensitiveCompare(completion) == .orderedSame }) {
                         slots.append(completion)
                     }
