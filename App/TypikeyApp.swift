@@ -450,7 +450,7 @@ struct EngineStatusSection: View {
                 }
             } catch {
                 await MainActor.run {
-                    probeResult = "Generation failed: \(error.localizedDescription)"
+                    probeResult = "Generation failed: \(String(describing: error))"
                     probing = false
                 }
             }
