@@ -72,9 +72,9 @@ struct ConversationDemoView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Write a reply")
                         .font(.headline)
-                    TextField("Tap here, then switch to Typikey", text: $reply, axis: .vertical)
-                        .font(.title3)
-                        .lineLimit(2...5)
+                    PlainTextView(text: $reply,
+                                  placeholder: "Tap here, then switch to Typikey",
+                                  minHeight: 90)
                         .accessibilityIdentifier("demoReplyField")
 
                     // Mirrors what the keyboard offers at the letters level,

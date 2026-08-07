@@ -19,7 +19,12 @@ final class MyWordsTests: XCTestCase {
             app.buttons["My Words & Phrases"].tap()
         }
 
+        // The add field sits below the candidate sections, and a List only
+        // renders what is on screen — on a phone it starts out of view.
         let field = app.textFields["myWordsField"]
+        for _ in 0..<4 where !field.exists {
+            app.swipeUp()
+        }
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
 
