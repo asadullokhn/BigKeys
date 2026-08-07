@@ -44,8 +44,57 @@ private enum WordClass {
         case .noun:       return UIColor(red: 1.00, green: 0.80, blue: 0.58, alpha: 1) // orange
         case .social:     return UIColor(red: 1.00, green: 0.75, blue: 0.85, alpha: 1) // pink
         case .question:   return UIColor(red: 0.85, green: 0.75, blue: 0.98, alpha: 1) // purple
-        case .punct:      return UIColor(red: 0.82, green: 0.82, blue: 0.84, alpha: 1) // gray
+        case .punct:      return Palette.paper
         }
+    }
+}
+
+/// The keyboard's whole visual system, in one place.
+///
+/// The rule, learnable in one sentence: **light keys put words on the
+/// screen; dark keys change the board or fix what you wrote.** Before this,
+/// punctuation, letters, category tiles and the delete keys were four
+/// different shades of gray — indistinguishable at a glance despite doing
+/// completely different things. Now the shade IS the meaning.
+///
+/// Fixed (non-adaptive) colors on purpose: an AAC board must look identical
+/// in every lighting mode, because the user navigates it by remembered
+/// color and position, not by reading it fresh each time.
+private enum Palette {
+    /// Types a character — letters, numbers, punctuation. Word cells use
+    /// their Fitzgerald class color instead, but sit in the same light
+    /// family so "light = writes" holds for all of them.
+    static let paper = UIColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1)
+    /// Moves you somewhere: Home, Categories, abc/123, EN/MS, size, tiles.
+    static let navigate = UIColor(red: 0.35, green: 0.43, blue: 0.54, alpha: 1)
+    /// Fixes what you wrote: delete, word-delete, cursors, return, dismiss.
+    static let edit = UIColor(red: 0.24, green: 0.27, blue: 0.32, alpha: 1)
+    /// Clear all, once armed — the only irreversible key on the board.
+    static let destructive = UIColor(red: 0.84, green: 0.24, blue: 0.24, alpha: 1)
+    /// Ring drawn around the key under the finger. Explore-then-commit only
+    /// works if "which key am I on" is unmistakable, so the highlight is a
+    /// thick ring plus a shade shift rather than a color swap — the class
+    /// color has to survive, since that is what the user is aiming by.
+    static let focus = UIColor(red: 0.00, green: 0.42, blue: 0.90, alpha: 1)
+
+    static let onLight = UIColor.black
+    static let onDark = UIColor.white
+}
+
+private extension UIColor {
+    /// Shifts a color toward black or white by `amount` (0-1). Used for the
+    /// focus state: light keys deepen, dark keys lift, so every key visibly
+    /// reacts no matter where it sits on the scale.
+    func shifted(by amount: CGFloat) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard getRed(&r, green: &g, blue: &b, alpha: &a) else { return self }
+        let isDark = (0.299 * r + 0.587 * g + 0.114 * b) < 0.5
+        let target: CGFloat = isDark ? 1 : 0
+        return UIColor(
+            red: r + (target - r) * amount,
+            green: g + (target - g) * amount,
+            blue: b + (target - b) * amount,
+            alpha: a)
     }
 }
 
@@ -934,11 +983,14 @@ final class KeyboardViewController: UIInputViewController {
     private func buildSuggestionBar() {
         for i in 0..<3 {
             let button = UIButton(type: .system)
-            button.titleLabel?.font = .systemFont(ofSize: 24, weight: .medium)
+            button.titleLabel?.font = .systemFont(ofSize: 23, weight: .semibold)
             button.titleLabel?.adjustsFontSizeToFitWidth = true
-            button.titleLabel?.minimumScaleFactor = 0.6
-            button.backgroundColor = .secondarySystemBackground
-            button.layer.cornerRadius = 10
+            button.titleLabel?.minimumScaleFactor = 0.65
+            // Filled pill, not tinted text: a suggestion is a target to be
+            // hit, so it has to look as tappable as a key.
+            button.backgroundColor = Palette.paper
+            button.setTitleColor(Palette.onLight, for: .normal)
+            button.layer.cornerRadius = 14
             button.tag = i
             button.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
             trackingView.addSubview(button)
@@ -998,8 +1050,13 @@ final class KeyboardViewController: UIInputViewController {
         keyLabel.numberOfLines = 2
         keyLabel.textAlignment = .center
         keyLabel.adjustsFontSizeToFitWidth = true
-        keyLabel.minimumScaleFactor = 0.5
-        keyLabel.layer.cornerRadius = 10
+        // Was 0.5, which let "I use this to talk" shrink to roughly half the
+        // size of "I" on the same board — the longest labels became the
+        // hardest to read. Wrapping to a second line first keeps every key
+        // within one comfortable size band.
+        keyLabel.lineBreakMode = .byWordWrapping
+        keyLabel.minimumScaleFactor = 0.7
+        keyLabel.layer.cornerRadius = 14
         keyLabel.layer.masksToBounds = true
         keyLabel.isUserInteractionEnabled = false
         style(keyLabel, action: def.0, label: def.1, highlighted: false)
@@ -1007,63 +1064,90 @@ final class KeyboardViewController: UIInputViewController {
         keys.append(Key(action: def.0, label: def.1, view: keyLabel, row: row, col: col, colSpan: colSpan, rowSpan: rowSpan))
     }
 
-    private func style(_ label: UILabel, action: KeyAction, label text: String, highlighted: Bool) {
-        if highlighted {
-            label.backgroundColor = .systemBlue
-            label.textColor = .white
-        } else if case .toWords = action {
-            label.backgroundColor = .systemGray4
-            label.textColor = .label
-        } else if case .word(let w) = action, let word = vocabIndex[w] {
-            label.backgroundColor = word.wordClass.color
-            label.textColor = .black
-        } else if case .word(let w) = action, myWords.contains(where: { $0.caseInsensitiveCompare(w) == .orderedSame }) {
-            label.backgroundColor = WordClass.social.color
-            label.textColor = .black
-        } else if case .punct = action {
-            label.backgroundColor = WordClass.punct.color
-            label.textColor = .black
-        } else if case .char = action {
-            label.backgroundColor = .systemGray5
-            label.textColor = .label
-        } else {
-            label.backgroundColor = .systemGray3
-            label.textColor = .label
+    /// Which of the three jobs a key does. The role decides its color, and
+    /// the color is the only thing the user needs to read to know whether a
+    /// key will write, travel, or undo.
+    private enum KeyRole { case write, navigate, edit }
+
+    private func role(of action: KeyAction) -> KeyRole {
+        switch action {
+        case .word, .punct, .char, .space:
+            return .write
+        case .home, .toCategories, .toWords, .toLetters, .toNumbers, .language, .size, .shift:
+            return .navigate
+        case .delete, .deleteWord, .clearAll, .cursorLeft, .cursorRight, .ret, .dismiss:
+            return .edit
         }
+    }
+
+    private func style(_ label: UILabel, action: KeyAction, label text: String, highlighted: Bool) {
+        var background: UIColor
+        switch role(of: action) {
+        case .write:
+            if case .word(let w) = action, let word = vocabIndex[w] {
+                background = word.wordClass.color
+            } else if case .word = action {
+                background = WordClass.social.color // a word of the user's own
+            } else {
+                background = Palette.paper
+            }
+        case .navigate:
+            background = Palette.navigate
+        case .edit:
+            // Armed clear-all is the one irreversible key; it announces
+            // itself in red rather than relying on the label change alone.
+            background = (isClearAllArmed(action)) ? Palette.destructive : Palette.edit
+        }
+
+        let onDark = background == Palette.navigate || background == Palette.edit
+            || background == Palette.destructive
+        let foreground = onDark ? Palette.onDark : Palette.onLight
+        label.backgroundColor = highlighted ? background.shifted(by: 0.22) : background
+        label.textColor = foreground
+        label.layer.borderWidth = highlighted ? 4 : 0
+        label.layer.borderColor = highlighted ? Palette.focus.cgColor : nil
 
         switch action {
         case .word(let w):
             if let word = vocabIndex[w], let emoji = word.emoji {
+                // The WORD is what gets typed, so it leads; the emoji is a
+                // recognition cue above it, deliberately smaller. It used to
+                // be the other way round, which made the label hard to read.
                 let content = NSMutableAttributedString(
-                    string: emoji + "\n", attributes: [.font: UIFont.systemFont(ofSize: 26)])
+                    string: emoji + "\n", attributes: [.font: UIFont.systemFont(ofSize: 17)])
                 content.append(NSAttributedString(
                     string: text, attributes: [
-                        .font: UIFont.systemFont(ofSize: 15, weight: .semibold),
-                        .foregroundColor: highlighted ? UIColor.white : UIColor.black,
+                        .font: UIFont.systemFont(ofSize: 19, weight: .semibold),
+                        .foregroundColor: foreground,
                     ]))
                 label.attributedText = content
             } else {
                 label.attributedText = nil
-                label.font = .systemFont(ofSize: 20, weight: .semibold)
+                label.font = .systemFont(ofSize: 21, weight: .semibold)
                 label.text = text
             }
         case .punct:
             label.attributedText = nil
-            label.font = .systemFont(ofSize: 28, weight: .semibold)
-            label.text = text
-        case .toWords, .toCategories:
-            label.attributedText = nil
-            label.font = .systemFont(ofSize: 17, weight: .semibold)
+            label.font = .systemFont(ofSize: 30, weight: .semibold)
             label.text = text
         case .char:
             label.attributedText = nil
-            label.font = .systemFont(ofSize: 34, weight: .medium)
+            label.font = .systemFont(ofSize: 32, weight: .medium)
             label.text = level == .letters && shifted ? text.uppercased() : text
+        case .home, .toCategories, .toWords, .toLetters, .toNumbers, .language, .size, .shift:
+            label.attributedText = nil
+            label.font = .systemFont(ofSize: 18, weight: .semibold)
+            label.text = text
         default:
             label.attributedText = nil
-            label.font = .systemFont(ofSize: 22, weight: .medium)
+            label.font = .systemFont(ofSize: 19, weight: .medium)
             label.text = text
         }
+    }
+
+    private func isClearAllArmed(_ action: KeyAction) -> Bool {
+        if case .clearAll = action { return clearArmedAt != nil }
+        return false
     }
 
     private func restyleAll() {
@@ -1527,7 +1611,11 @@ final class KeyboardViewController: UIInputViewController {
         let titles: [String]
         if isWordLevel {
             if !completionWords.isEmpty {
-                var slots: [String] = ["▸ " + completionWords[0]]
+                // Two chips, no symbols to decode: the short one is the next
+                // word, the long one is the whole continuation. Since the
+                // long chip starts with the short chip's word, the
+                // relationship explains itself.
+                var slots: [String] = [completionWords[0]]
                 if completionWords.count >= 2 {
                     slots.append(completionWords.joined(separator: " "))
                 }
@@ -1581,7 +1669,7 @@ final class KeyboardViewController: UIInputViewController {
         UIDevice.current.playInputClick()
         impactFeedback.impactOccurred()
         if isWordLevel, !completionWords.isEmpty {
-            if title == "▸ " + completionWords[0] {
+            if title == completionWords[0] {
                 insertWord(completionWords[0])
                 completionWords = []
                 updateSuggestions()
