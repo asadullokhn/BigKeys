@@ -69,11 +69,11 @@ final class SampleHandler: RPBroadcastSampleHandler {
     /// shared store. Written through every processed frame — at most one
     /// write / 2 s — so a jetsam kill mid-session loses nothing.
     private func harvest() {
-        let frameWords = ScreenWords.words(from: textRequest)
+        let (frameWords, names) = ScreenWords.harvest(from: textRequest)
         let fresh = frameWords.subtracting(previousFrameWords)
         previousFrameWords = frameWords
         guard let suite else { return }
         suite.set(Date().timeIntervalSince1970, forKey: "screenLastFrame")
-        ScreenWords.merge(fresh, into: suite)
+        ScreenWords.merge(fresh, names: names.intersection(fresh), into: suite)
     }
 }

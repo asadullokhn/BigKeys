@@ -20,264 +20,6 @@ import NaturalLanguage
 
 // MARK: - Language
 
-enum Lang: String {
-    case en, ms // English, Malay (Bahasa Melayu) — Singapore's context
-
-    var spellCheckCode: String {
-        switch self {
-        case .en: return "en_US"
-        case .ms: return "ms_MY"
-        }
-    }
-}
-
-// MARK: - Vocabulary
-
-private enum WordClass {
-    case pronoun, verb, descriptor, noun, social, question, punct
-
-    var color: UIColor {
-        switch self {
-        case .pronoun:    return UIColor(red: 1.00, green: 0.92, blue: 0.55, alpha: 1) // yellow
-        case .verb:       return UIColor(red: 0.72, green: 0.90, blue: 0.63, alpha: 1) // green
-        case .descriptor: return UIColor(red: 0.65, green: 0.82, blue: 0.98, alpha: 1) // blue
-        case .noun:       return UIColor(red: 1.00, green: 0.80, blue: 0.58, alpha: 1) // orange
-        case .social:     return UIColor(red: 1.00, green: 0.75, blue: 0.85, alpha: 1) // pink
-        case .question:   return UIColor(red: 0.85, green: 0.75, blue: 0.98, alpha: 1) // purple
-        case .punct:      return Palette.paper
-        }
-    }
-}
-
-/// The keyboard's whole visual system, in one place.
-///
-/// The rule, learnable in one sentence: **light keys put words on the
-/// screen; dark keys change the board or fix what you wrote.** Before this,
-/// punctuation, letters, category tiles and the delete keys were four
-/// different shades of gray — indistinguishable at a glance despite doing
-/// completely different things. Now the shade IS the meaning.
-///
-/// Fixed (non-adaptive) colors on purpose: an AAC board must look identical
-/// in every lighting mode, because the user navigates it by remembered
-/// color and position, not by reading it fresh each time.
-private enum Palette {
-    /// Types a character — letters, numbers, punctuation. Word cells use
-    /// their Fitzgerald class color instead, but sit in the same light
-    /// family so "light = writes" holds for all of them.
-    static let paper = UIColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1)
-    /// Moves you somewhere: Home, Categories, abc/123, EN/MS, size, tiles.
-    static let navigate = UIColor(red: 0.35, green: 0.43, blue: 0.54, alpha: 1)
-    /// Fixes what you wrote: delete, word-delete, cursors, return, dismiss.
-    static let edit = UIColor(red: 0.24, green: 0.27, blue: 0.32, alpha: 1)
-    /// Clear all, once armed — the only irreversible key on the board.
-    static let destructive = UIColor(red: 0.84, green: 0.24, blue: 0.24, alpha: 1)
-    /// Ring drawn around the key under the finger. Explore-then-commit only
-    /// works if "which key am I on" is unmistakable, so the highlight is a
-    /// thick ring plus a shade shift rather than a color swap — the class
-    /// color has to survive, since that is what the user is aiming by.
-    static let focus = UIColor(red: 0.00, green: 0.42, blue: 0.90, alpha: 1)
-
-    static let onLight = UIColor.black
-    static let onDark = UIColor.white
-}
-
-private extension UIColor {
-    /// Shifts a color toward black or white by `amount` (0-1). Used for the
-    /// focus state: light keys deepen, dark keys lift, so every key visibly
-    /// reacts no matter where it sits on the scale.
-    func shifted(by amount: CGFloat) -> UIColor {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        guard getRed(&r, green: &g, blue: &b, alpha: &a) else { return self }
-        let isDark = (0.299 * r + 0.587 * g + 0.114 * b) < 0.5
-        let target: CGFloat = isDark ? 1 : 0
-        return UIColor(
-            red: r + (target - r) * amount,
-            green: g + (target - g) * amount,
-            blue: b + (target - b) * amount,
-            alpha: a)
-    }
-}
-
-// A cell is one concept with one grid position; language only changes its
-// label. Malay translations are drafts — verify with Fadillah before
-// putting this in front of Sayfullah.
-private struct VocabWord {
-    let en: String
-    let ms: String
-    let emoji: String?
-    let wordClass: WordClass
-
-    init(_ en: String, ms: String? = nil, emoji: String? = nil, _ wordClass: WordClass) {
-        self.en = en
-        self.ms = ms ?? en
-        self.emoji = emoji
-        self.wordClass = wordClass
-    }
-
-    func text(_ lang: Lang) -> String {
-        lang == .ms ? ms : en
-    }
-}
-
-private struct Category {
-    let en: String
-    let ms: String
-    let words: [VocabWord]
-
-    func name(_ lang: Lang) -> String {
-        lang == .ms ? ms : en
-    }
-}
-
-private let vocabulary: [Category] = [
-    Category(en: "Core", ms: "Teras", words: [
-        VocabWord("I", ms: "saya", .pronoun), VocabWord("you", ms: "awak", .pronoun),
-        VocabWord("want", ms: "mahu", .verb), VocabWord("like", ms: "suka", .verb),
-        VocabWord("go", ms: "pergi", .verb), VocabWord("help", ms: "tolong", emoji: "🤝", .verb),
-        VocabWord("more", ms: "lagi", .descriptor), VocabWord("stop", ms: "berhenti", emoji: "✋", .verb),
-        VocabWord("yes", ms: "ya", emoji: "✅", .social), VocabWord("no", ms: "tidak", emoji: "❌", .social),
-        VocabWord("not", ms: "bukan", .descriptor), VocabWord("this", ms: "ini", .pronoun),
-        VocabWord("that", ms: "itu", .pronoun), VocabWord("good", ms: "bagus", emoji: "👍", .descriptor),
-        VocabWord("bad", ms: "teruk", emoji: "👎", .descriptor), VocabWord("now", ms: "sekarang", .descriptor),
-        VocabWord("later", ms: "nanti", .descriptor), VocabWord("what", ms: "apa", .question),
-        VocabWord("where", ms: "di mana", .question), VocabWord("when", ms: "bila", .question),
-        VocabWord("who", ms: "siapa", .question), VocabWord("can", ms: "boleh", .verb),
-        VocabWord(".", .punct), VocabWord("?", .punct),
-    ]),
-    Category(en: "People", ms: "Orang", words: [
-        VocabWord("I", ms: "saya", .pronoun), VocabWord("you", ms: "awak", .pronoun),
-        VocabWord("Mum", ms: "Ibu", emoji: "👩", .noun), VocabWord("Dad", ms: "Ayah", emoji: "👨", .noun),
-        VocabWord("brother", ms: "abang", emoji: "👦", .noun), VocabWord("sister", ms: "kakak", emoji: "👧", .noun),
-        VocabWord("friend", ms: "kawan", emoji: "🧑‍🤝‍🧑", .noun), VocabWord("teacher", ms: "cikgu", emoji: "🧑‍🏫", .noun),
-        VocabWord("doctor", ms: "doktor", emoji: "🧑‍⚕️", .noun), VocabWord("everyone", ms: "semua", emoji: "👥", .noun),
-        VocabWord("we", ms: "kami", .pronoun), VocabWord("they", ms: "mereka", .pronoun),
-    ]),
-    Category(en: "Actions", ms: "Tindakan", words: [
-        VocabWord("eat", ms: "makan", emoji: "🍽️", .verb), VocabWord("drink", ms: "minum", emoji: "🥤", .verb),
-        VocabWord("play", ms: "main", emoji: "🎮", .verb), VocabWord("watch", ms: "tonton", emoji: "📺", .verb),
-        VocabWord("draw", ms: "lukis", emoji: "🎨", .verb), VocabWord("read", ms: "baca", emoji: "📖", .verb),
-        VocabWord("write", ms: "tulis", emoji: "✍️", .verb), VocabWord("make", ms: "buat", emoji: "🛠️", .verb),
-        VocabWord("open", ms: "buka", .verb), VocabWord("close", ms: "tutup", .verb),
-        VocabWord("give", ms: "beri", .verb), VocabWord("get", ms: "dapat", .verb),
-        VocabWord("come", ms: "datang", .verb), VocabWord("look", ms: "tengok", emoji: "👀", .verb),
-        VocabWord("listen", ms: "dengar", emoji: "👂", .verb), VocabWord("wait", ms: "tunggu", emoji: "⏳", .verb),
-    ]),
-    Category(en: "Feelings", ms: "Perasaan", words: [
-        VocabWord("happy", ms: "gembira", emoji: "😊", .descriptor), VocabWord("sad", ms: "sedih", emoji: "😢", .descriptor),
-        VocabWord("angry", ms: "marah", emoji: "😠", .descriptor), VocabWord("tired", ms: "penat", emoji: "😴", .descriptor),
-        VocabWord("excited", ms: "teruja", emoji: "🤩", .descriptor), VocabWord("scared", ms: "takut", emoji: "😨", .descriptor),
-        VocabWord("bored", ms: "bosan", emoji: "🥱", .descriptor), VocabWord("sick", ms: "sakit", emoji: "🤒", .descriptor),
-        VocabWord("hungry", ms: "lapar", emoji: "😋", .descriptor), VocabWord("thirsty", ms: "haus", emoji: "🥵", .descriptor),
-        VocabWord("okay", ms: "okay", emoji: "🙆", .descriptor), VocabWord("great", ms: "hebat", emoji: "🌟", .descriptor),
-    ]),
-    Category(en: "Food", ms: "Makanan", words: [
-        VocabWord("water", ms: "air", emoji: "💧", .noun), VocabWord("rice", ms: "nasi", emoji: "🍚", .noun),
-        VocabWord("chicken", ms: "ayam", emoji: "🍗", .noun), VocabWord("noodles", ms: "mi", emoji: "🍜", .noun),
-        VocabWord("bread", ms: "roti", emoji: "🍞", .noun), VocabWord("fruit", ms: "buah", emoji: "🍎", .noun),
-        VocabWord("banana", ms: "pisang", emoji: "🍌", .noun), VocabWord("juice", ms: "jus", emoji: "🧃", .noun),
-        VocabWord("milk", ms: "susu", emoji: "🥛", .noun), VocabWord("tea", ms: "teh", emoji: "🍵", .noun),
-        VocabWord("biryani", ms: "briyani", emoji: "🍛", .noun), VocabWord("chocolate", ms: "coklat", emoji: "🍫", .noun),
-    ]),
-    Category(en: "Places", ms: "Tempat", words: [
-        VocabWord("home", ms: "rumah", emoji: "🏠", .noun), VocabWord("school", ms: "sekolah", emoji: "🏫", .noun),
-        VocabWord("outside", ms: "luar", emoji: "🌳", .noun), VocabWord("shop", ms: "kedai", emoji: "🛒", .noun),
-        VocabWord("park", ms: "taman", emoji: "🏞️", .noun), VocabWord("bus", ms: "bas", emoji: "🚌", .noun),
-        VocabWord("MRT", emoji: "🚇", .noun), VocabWord("restaurant", ms: "restoran", emoji: "🍔", .noun),
-        VocabWord("hospital", emoji: "🏥", .noun), VocabWord("toilet", ms: "tandas", emoji: "🚻", .noun),
-        VocabWord("here", ms: "sini", .descriptor), VocabWord("there", ms: "sana", .descriptor),
-    ]),
-    Category(en: "Art", ms: "Seni", words: [
-        VocabWord("draw", ms: "lukis", emoji: "🎨", .verb), VocabWord("paint", ms: "cat", emoji: "🖌️", .verb),
-        VocabWord("color", ms: "warna", emoji: "🌈", .noun), VocabWord("picture", ms: "gambar", emoji: "🖼️", .noun),
-        VocabWord("comic", ms: "komik", emoji: "📚", .noun), VocabWord("monster", ms: "raksasa", emoji: "👾", .noun),
-        VocabWord("idea", emoji: "💡", .noun), VocabWord("cool", ms: "menarik", emoji: "😎", .descriptor),
-        VocabWord("funny", ms: "kelakar", emoji: "😂", .descriptor), VocabWord("new", ms: "baru", emoji: "✨", .descriptor),
-        VocabWord("finished", ms: "siap", emoji: "🏁", .descriptor), VocabWord("show you", ms: "tunjuk", emoji: "👀", .social),
-    ]),
-    // Browsing is its own vocabulary: the words that move you around a page
-    // or a video are almost none of the words you use to talk to a person,
-    // and typing them letter by letter is exactly the cost this keyboard
-    // exists to remove.
-    Category(en: "Web", ms: "Web", words: [
-        VocabWord("search", ms: "cari", emoji: "🔍", .verb), VocabWord("open", ms: "buka", .verb),
-        VocabWord("watch", ms: "tonton", emoji: "📺", .verb), VocabWord("play", ms: "main", emoji: "▶️", .verb),
-        VocabWord("next", ms: "seterusnya", emoji: "⏭️", .descriptor), VocabWord("back", ms: "kembali", emoji: "◀️", .descriptor),
-        VocabWord("video", ms: "video", emoji: "🎬", .noun), VocabWord("music", ms: "muzik", emoji: "🎵", .noun),
-        VocabWord("news", ms: "berita", emoji: "📰", .noun), VocabWord("game", ms: "permainan", emoji: "🎮", .noun),
-        VocabWord("YouTube", emoji: "▶️", .noun), VocabWord("Google", emoji: "🔎", .noun),
-        VocabWord("link", ms: "pautan", emoji: "🔗", .noun), VocabWord("page", ms: "halaman", emoji: "📄", .noun),
-        VocabWord("share", ms: "kongsi", emoji: "📤", .verb), VocabWord("download", ms: "muat turun", emoji: "⬇️", .verb),
-        VocabWord("www.", .noun), VocabWord(".com", .noun),
-        VocabWord("how to", ms: "bagaimana", .question), VocabWord("what is", ms: "apa itu", .question),
-    ]),
-    Category(en: "Chat", ms: "Sembang", words: [
-        VocabWord("hello", ms: "hai", emoji: "👋", .social), VocabWord("bye", emoji: "👋", .social),
-        VocabWord("please", ms: "tolong", emoji: "🙏", .social), VocabWord("thank you", ms: "terima kasih", emoji: "🙏", .social),
-        VocabWord("sorry", ms: "maaf", .social), VocabWord("how are you", ms: "apa khabar", .social),
-        VocabWord("I'm good", ms: "khabar baik", .social), VocabWord("wait a moment", ms: "tunggu sekejap", emoji: "⏳", .social),
-        VocabWord("nice to meet you", ms: "selamat berkenalan", .social), VocabWord("see you later", ms: "jumpa lagi", .social),
-        VocabWord("I use this to talk", ms: "Saya guna ini untuk bercakap", emoji: "💬", .social),
-        VocabWord("haha", emoji: "😂", .social),
-    ]),
-]
-
-/// Lookup by either language's text, so Recents keeps color and emoji
-/// regardless of which language a word was used in.
-private let vocabIndex: [String: VocabWord] = {
-    var index: [String: VocabWord] = [:]
-    for category in vocabulary {
-        for word in category.words {
-            if index[word.en] == nil { index[word.en] = word }
-            if index[word.ms] == nil { index[word.ms] = word }
-        }
-    }
-    return index
-}()
-
-/// Seed bigrams per language so prediction is useful before any learning.
-private let seedBigrams: [Lang: [String: [String]]] = [
-    .en: [
-        "": ["I", "you", "hello"],
-        "i": ["want", "like", "need"],
-        "you": ["can", "want", "okay"],
-        "want": ["more", "that", "food"],
-        "like": ["this", "that", "it"],
-        "can": ["you", "we", "help"],
-        "go": ["home", "outside", "now"],
-        "help": ["me", "please"],
-        "more": ["please", "time"],
-        "what": ["time", "happened"],
-        "where": ["are", "is"],
-        "not": ["good", "now", "yet"],
-        "this": ["is", "one"],
-        "that": ["is", "one"],
-        "eat": ["rice", "chicken", "now"],
-        "drink": ["water", "juice", "tea"],
-        "draw": ["monster", "picture", "now"],
-        "my": ["Mum", "friend", "idea"],
-        "thank": ["you"],
-        "how": ["are you"],
-    ],
-    .ms: [
-        "": ["Saya", "awak", "hai"],
-        "saya": ["mahu", "suka", "boleh"],
-        "awak": ["boleh", "mahu", "okay"],
-        "mahu": ["makan", "lagi", "itu"],
-        "suka": ["ini", "itu"],
-        "boleh": ["tolong", "pergi"],
-        "pergi": ["rumah", "sekolah", "sekarang"],
-        "tolong": ["saya"],
-        "makan": ["nasi", "ayam", "sekarang"],
-        "minum": ["air", "jus", "teh"],
-        "lukis": ["raksasa", "gambar"],
-        "terima": ["kasih"],
-        "apa": ["khabar"],
-        "tidak": ["mahu", "boleh"],
-    ],
-]
-
-// MARK: - Controller
-
 final class KeyboardViewController: UIInputViewController {
 
     private enum KeyAction: Equatable {
@@ -364,6 +106,15 @@ final class KeyboardViewController: UIInputViewController {
     private var keys: [Key] = []
     private var contentRowCount = 4
 
+    /// Private mode: typing works exactly as always, nothing is remembered.
+    /// Re-read on every appearance so a toggle in the app takes effect on
+    /// the very next field, not after a restart.
+    private var isPrivate = false
+
+    /// Whether verb keys follow the sentence. Every AAC product with this
+    /// feature ships a way to turn it off; see `Preferences.smartGrammar`.
+    private var smartGrammar = true
+
     /// The form verb cells are currently showing, recomputed whenever the
     /// text around the cursor changes. Held rather than derived on the fly
     /// so a rebuild is only triggered when the form actually changes.
@@ -404,7 +155,7 @@ final class KeyboardViewController: UIInputViewController {
     // Haptics are a no-op on iPads (no Taptic Engine) — wired anyway so an
     // iPhone build gets them for free. The input click is the audible
     // press feedback and needs no Full Access.
-    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+    private let haptics = Haptics()
 
     private let trackingView = TrackingView()
     private var suggestionButtons: [UIButton] = []
@@ -477,6 +228,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        haptics.prepare()
         view.backgroundColor = .clear
 
         usageCounts = (store.dictionary(forKey: "usage") as? [String: Int]) ?? [:]
@@ -508,7 +260,7 @@ final class KeyboardViewController: UIInputViewController {
         ])
         heightConstraint = height
 
-        boardBackground.backgroundColor = .systemBackground
+        boardBackground.backgroundColor = isPrivate ? Palette.privateBoard : Palette.board
         trackingView.addSubview(boardBackground)
 
         let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
@@ -537,8 +289,11 @@ final class KeyboardViewController: UIInputViewController {
         // Reload before buildKeys() below so app-side My Words edits and a
         // fresh field both show up on this appearance, and so a stale
         // in-progress token from a previous field never leaks into a new one.
+        isPrivate = Preferences.privateMode(in: store)
+        smartGrammar = Preferences.smartGrammar(in: store)
         myWords = (store.array(forKey: "myWords") as? [String]) ?? []
         reloadScreenWords()
+        promoteFrequentWords()
         typedToken = ""
         heightConstraint?.constant = requestedHeight
         let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
@@ -666,7 +421,7 @@ final class KeyboardViewController: UIInputViewController {
     /// slide, since rebuilding drops the highlight. `buildKeys` recomputes
     /// the form itself, so this only decides whether to call it.
     private func refreshVerbForms() {
-        guard lang == .en, isWordLevel else { return }
+        guard lang == .en, smartGrammar, isWordLevel else { return }
         guard Grammar.verbForm(after: contextBefore()) != verbForm else { return }
         buildKeys()
     }
@@ -899,7 +654,7 @@ final class KeyboardViewController: UIInputViewController {
         // The cell does not move — this is the same relabel-in-place
         // mechanism as the language switch (invariants 1 and 7). English
         // only; Malay marks tense with particles, not inflection.
-        if word.wordClass == .verb, lang == .en {
+        if word.wordClass == .verb, lang == .en, smartGrammar {
             let inflected = Grammar.inflect(text, as: verbForm)
             if inflected != text {
                 inflectionBase[inflected] = text
@@ -1037,9 +792,11 @@ final class KeyboardViewController: UIInputViewController {
             button.titleLabel?.minimumScaleFactor = 0.65
             // Filled pill, not tinted text: a suggestion is a target to be
             // hit, so it has to look as tappable as a key.
-            button.backgroundColor = Palette.paper
-            button.setTitleColor(Palette.onLight, for: .normal)
-            button.layer.cornerRadius = 14
+            button.backgroundColor = Palette.suggestionFill
+            button.setTitleColor(Palette.action, for: .normal)
+            button.layer.cornerRadius = 12
+            button.layer.borderWidth = 1
+            button.layer.borderColor = Palette.suggestionBorder.cgColor
             button.tag = i
             button.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
             trackingView.addSubview(button)
@@ -1061,7 +818,7 @@ final class KeyboardViewController: UIInputViewController {
         // Recomputed here, on every rebuild, so the board is right no
         // matter what caused it — a level change back from the letters
         // keyboard, a re-show, or the sentence simply moving on.
-        verbForm = lang == .en ? Grammar.verbForm(after: contextBefore()) : .base
+        verbForm = (lang == .en && smartGrammar) ? Grammar.verbForm(after: contextBefore()) : .base
         inflectionBase.removeAll()
 
         let content = contentRows(for: level)
@@ -1122,15 +879,17 @@ final class KeyboardViewController: UIInputViewController {
     /// Which of the three jobs a key does. The role decides its color, and
     /// the color is the only thing the user needs to read to know whether a
     /// key will write, travel, or undo.
-    private enum KeyRole { case write, navigate, edit }
+    private enum KeyRole { case write, navigate, edit, action }
 
     private func role(of action: KeyAction) -> KeyRole {
         switch action {
         case .word, .punct, .char, .space:
             return .write
+        case .ret:
+            return .action // Enter finishes the message; the design's one blue key
         case .home, .toCategories, .toWords, .toLetters, .toNumbers, .language, .size, .shift:
             return .navigate
-        case .delete, .deleteWord, .clearAll, .cursorLeft, .cursorRight, .ret, .dismiss:
+        case .delete, .deleteWord, .clearAll, .cursorLeft, .cursorRight, .dismiss:
             return .edit
         }
     }
@@ -1148,19 +907,21 @@ final class KeyboardViewController: UIInputViewController {
             }
         case .navigate:
             background = Palette.navigate
+        case .action:
+            background = Palette.action
         case .edit:
             // Armed clear-all is the one irreversible key; it announces
             // itself in red rather than relying on the label change alone.
             background = (isClearAllArmed(action)) ? Palette.destructive : Palette.edit
         }
 
-        let onDark = background == Palette.navigate || background == Palette.edit
-            || background == Palette.destructive
-        let foreground = onDark ? Palette.onDark : Palette.onLight
-        label.backgroundColor = highlighted ? background.shifted(by: 0.22) : background
+        let foreground = Palette.foreground(on: background)
+        label.backgroundColor = highlighted ? background.shifted(by: 0.18) : background
         label.textColor = foreground
-        label.layer.borderWidth = highlighted ? 4 : 0
-        label.layer.borderColor = highlighted ? Palette.focus.cgColor : nil
+        // Every key carries a hairline so two pale cells never merge into
+        // one target; the focus ring simply thickens and colours it.
+        label.layer.borderWidth = highlighted ? 4 : 1
+        label.layer.borderColor = (highlighted ? Palette.focus : Palette.keyBorder).cgColor
 
         switch action {
         case .word(let w):
@@ -1300,6 +1061,10 @@ final class KeyboardViewController: UIInputViewController {
     fileprivate func touchMoved(to point: CGPoint) {
         let index = keyIndex(at: point)
         guard index != highlightedIndex else { return }
+        // Crossing onto a new key is the moment the user needs confirming:
+        // sliding is free exploration, so this tick is how the board is read
+        // by feel rather than by eye.
+        if index != nil { haptics.slidToNewKey() }
         let old = highlightedIndex
         highlightedIndex = index
         if let old { style(keys[old].view, action: keys[old].action, label: keys[old].label, highlighted: false) }
@@ -1344,8 +1109,7 @@ final class KeyboardViewController: UIInputViewController {
            Date().timeIntervalSince(last.at) < debounceInterval {
             return
         }
-        UIDevice.current.playInputClick()
-        impactFeedback.impactOccurred()
+        haptics.commit()
         lastCommit = (action, Date())
 
         switch action {
@@ -1449,6 +1213,7 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         clearArmedAt = Date()
+        haptics.armedDestructive() // the next tap erases everything — say so by feel
         buildKeys() // relabel to "tap again"
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self, self.clearArmedAt != nil else { return }
@@ -1510,10 +1275,10 @@ final class KeyboardViewController: UIInputViewController {
         // fill up with three entries for the same cell.
         let counted = inflectionBase[word] ?? word
         usageCounts[counted, default: 0] += 1
-        store.set(usageCounts, forKey: "usage")
+        learn(usageCounts, forKey: "usage")
         if !previous.isEmpty {
             learnedBigrams["\(previous.lowercased())|\(counted)", default: 0] += 1
-            store.set(learnedBigrams, forKey: "bigrams")
+            learn(learnedBigrams, forKey: "bigrams")
         }
         refreshVerbForms()
     }
@@ -1563,7 +1328,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         var counts = (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
         counts[token, default: 0] += 1
-        store.set(counts, forKey: "captureCounts")
+        learn(counts, forKey: "captureCounts")
     }
 
     /// Case-insensitive check against myWords and the built-in vocabulary
@@ -1598,13 +1363,79 @@ final class KeyboardViewController: UIInputViewController {
     /// Screen learning input: the broadcast extension's word-frequency
     /// store, honored only while fresh. Without Full Access the key simply
     /// never exists in `.standard` and this stays empty.
+    /// The single gate every piece of learning passes through. In private
+    /// mode it does nothing, so a future feature cannot start remembering
+    /// something by forgetting to check a flag — the check lives in one
+    /// place rather than at seven call sites.
+    private func learn(_ value: Any, forKey key: String) {
+        guard !isPrivate else { return }
+        store.set(value, forKey: key)
+    }
+
     private func reloadScreenWords() {
-        let stamp = store.double(forKey: "screenWordsStamp")
+        // Screen words are learning too: in private mode they neither
+        // accumulate nor influence what is suggested.
+        guard !isPrivate else {
+            screenWords = [:]
+            return
+        }
+        let stamp = store.double(forKey: ScreenWords.stampKey)
         guard stamp > 0, Date().timeIntervalSince1970 - stamp < 1800 else {
             screenWords = [:]
             return
         }
-        screenWords = (store.dictionary(forKey: "screenWords") as? [String: Int]) ?? [:]
+        screenWords = (store.dictionary(forKey: ScreenWords.countsKey) as? [String: Int]) ?? [:]
+    }
+
+    /// Words that have proved themselves become keys on their own — no
+    /// Add button, no trip to the app. Asking a user who needs up to half a
+    /// minute per tap to curate a word list is asking for the one thing
+    /// this keyboard exists to avoid.
+    ///
+    /// Two sources qualify, both at three sightings: words typed out
+    /// letter by letter, and names read off the screen (capitalized
+    /// mid-sentence and unknown to the spell checker, which is what
+    /// separates "Hafiz" from "lunch"). Removing a word in My Words blocks
+    /// it permanently, so the automatic path stays correctable.
+    private func promoteFrequentWords() {
+        guard !isPrivate else { return }
+        var words = (store.array(forKey: "myWords") as? [String]) ?? []
+        let blocked = Set((store.array(forKey: ScreenWords.blockedKey) as? [String] ?? [])
+            .map { $0.lowercased() })
+        var existing = Set(words.map { $0.lowercased() })
+        var added: [String] = []
+
+        func adopt(_ word: String, capitalized: Bool) {
+            let lower = word.lowercased()
+            guard !existing.contains(lower), !blocked.contains(lower), added.count < 5 else { return }
+            existing.insert(lower)
+            added.append(capitalized ? word.capitalized : lower)
+        }
+
+        var captures = (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
+        for (word, count) in captures.sorted(by: { $0.value > $1.value }) where count >= 3 {
+            adopt(word, capitalized: false)
+            captures.removeValue(forKey: word)
+        }
+
+        let names = Set(store.array(forKey: ScreenWords.capsKey) as? [String] ?? [])
+        let checker = UITextChecker()
+        for (word, count) in screenWords.sorted(by: { $0.value > $1.value })
+        where count >= 3 && names.contains(word) {
+            // A name is a word the dictionary does not know. "Friday" is
+            // capitalized too, and belongs to the dictionary, not to him.
+            let range = NSRange(location: 0, length: word.utf16.count)
+            let misspelled = checker.rangeOfMisspelledWord(
+                in: word, range: range, startingAt: 0, wrap: false, language: "en_US")
+            guard misspelled.location != NSNotFound else { continue }
+            adopt(word, capitalized: true)
+        }
+
+        guard !added.isEmpty else { return }
+        words.append(contentsOf: added)
+        learn(words, forKey: "myWords")
+        learn(captures, forKey: "captureCounts")
+        myWords = words
     }
 
     /// Grid mode: predict likely next words from learned bigrams, seeded
@@ -1726,8 +1557,7 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func suggestionTapped(_ sender: UIButton) {
         guard let title = sender.title(for: .normal) else { return }
-        UIDevice.current.playInputClick()
-        impactFeedback.impactOccurred()
+        haptics.commit()
         if isWordLevel, !completionWords.isEmpty {
             if title == completionWords[0] {
                 insertWord(completionWords[0])
