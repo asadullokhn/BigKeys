@@ -8,8 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		279A952F2D8694A16DDE8465 /* ScreenLearningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C34EE826A9C2E88FA6D179E /* ScreenLearningTests.swift */; };
+		34DF27D384A8C18AD355C5F1 /* ScreenWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52ACB8836103B0ABB01D07BC /* ScreenWords.swift */; };
+		3CFD805A7C394D9A86940530 /* ScreenWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52ACB8836103B0ABB01D07BC /* ScreenWords.swift */; };
 		4F2971AAB04CB45F9F3A0D2B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B324A924FE66DC05CD87923 /* KeyboardViewController.swift */; };
 		591312BBAA426D1DE2ABB2BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 238704140C8DFC7E10D738C7 /* Assets.xcassets */; };
+		591FC447EABCDC5BDC33DD29 /* ScreenWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52ACB8836103B0ABB01D07BC /* ScreenWords.swift */; };
 		8DB6578CF757DE30411A8B1C /* TypikeyBroadcast.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FCCC334E9988B617A6DCEEFB /* TypikeyBroadcast.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9C862CD8CF1738B5038563A8 /* MyWordsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 167A2498198387A80DD85FC1 /* MyWordsTests.swift */; };
 		B9274BDBCA7F7A765DA6CCD7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */; };
@@ -66,6 +69,7 @@
 		1C34EE826A9C2E88FA6D179E /* ScreenLearningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenLearningTests.swift; sourceTree = "<group>"; };
 		238704140C8DFC7E10D738C7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2F4B7442BDF523BAC5B0E4C2 /* PinnedFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedFrameTests.swift; sourceTree = "<group>"; };
+		52ACB8836103B0ABB01D07BC /* ScreenWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWords.swift; sourceTree = "<group>"; };
 		540443137A743CBC5FFF53C0 /* Typikey.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Typikey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		671DF4A1D7A2DABAD334557F /* TypikeyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TypikeyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FA3846751FF38D84B3414E5 /* TypikeyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypikeyApp.swift; sourceTree = "<group>"; };
@@ -86,12 +90,21 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		2039E81F54811E23AE83073C /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				52ACB8836103B0ABB01D07BC /* ScreenWords.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		47820FF55406B277FF4A47FB = {
 			isa = PBXGroup;
 			children = (
 				A2508DCB118A6D799FE05AD5 /* App */,
 				AC6CEC8EAA5A0161C427CC57 /* Broadcast */,
 				BC0B541BBA06AE32F05B7232 /* Keyboard */,
+				2039E81F54811E23AE83073C /* Shared */,
 				AF67B2AFBC51848C7E1E95BB /* UITests */,
 				68B8D075CD1C91BAE90CA312 /* Products */,
 			);
@@ -305,6 +318,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				34DF27D384A8C18AD355C5F1 /* ScreenWords.swift in Sources */,
 				F358D447B20F9F451E7AF138 /* TypikeyApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -314,6 +328,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BD7FFEE284ED5DFC50FA2351 /* SampleHandler.swift in Sources */,
+				591FC447EABCDC5BDC33DD29 /* ScreenWords.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -323,6 +338,7 @@
 			files = (
 				BD72207B7019C86BCF8699CE /* CompletionEngine.swift in Sources */,
 				4F2971AAB04CB45F9F3A0D2B /* KeyboardViewController.swift in Sources */,
+				3CFD805A7C394D9A86940530 /* ScreenWords.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -457,7 +473,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = Y7ZZ5G2T3Y;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -537,7 +553,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = Y7ZZ5G2T3Y;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
