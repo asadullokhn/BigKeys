@@ -64,6 +64,8 @@ struct SetupView: View {
                     }
                     .buttonStyle(.plain)
 
+                    PrivateModeCard()
+
                     ScreenLearningCard()
 
                     NavigationLink {
@@ -155,7 +157,7 @@ struct SetupView: View {
 /// Shared card chrome for the home screen: a rounded, softly shaded
 /// surface on the system's secondary grouped background so it reads
 /// correctly in both light and dark mode.
-private extension View {
+extension View {
     func homeCardStyle() -> some View {
         padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -500,103 +502,13 @@ struct MyWordsView: View {
     @State private var armedWord: String?
     @State private var newWord = ""
 
-    private var captureCandidates: [(word: String, count: Int)] {
-        captureCounts
-            .filter { $0.value >= 3 }
-            .filter { candidate in !myWords.contains { $0.caseInsensitiveCompare(candidate.key) == .orderedSame } }
-            .map { (word: $0.key, count: $0.value) }
-            .sorted { $0.count > $1.count }
-    }
-
-    /// Names and places the screen reader picked up that aren't on the
-    /// board yet. Deliberately offered rather than added: a browsing
-    /// session can surface hundreds of words, and silently turning any of
-    /// them into permanent keys would both flood the board and take the
-    /// decision away from the person whose board it is. One tap accepts,
-    /// and accepted words are auto-filed to People or Places from there.
-    private var screenCandidates: [(word: String, count: Int, category: String)] {
-        screenWords
-            .filter { candidate in
-                !myWords.contains { $0.caseInsensitiveCompare(candidate.key) == .orderedSame }
-                    && !skippedScreenWords.contains(candidate.key)
-            }
-            .compactMap { entry in
-                guard let category = WordFiling.category(for: entry.key),
-                      category != "Actions" else { return nil }
-                return (word: entry.key, count: entry.value, category: category)
-            }
-            .sorted { $0.count > $1.count }
-    }
-
     var body: some View {
         List {
-            if !screenCandidates.isEmpty {
-                Section("Seen on your screen") {
-                    ForEach(screenCandidates, id: \.word) { candidate in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(candidate.word.capitalized)
-                                .font(.title2)
-                            Text("a name the keyboard read on your screen — add it and it joins the \(candidate.category) page")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 12) {
-                                Button {
-                                    addScreenWord(candidate.word)
-                                } label: {
-                                    Text("Add")
-                                        .font(.title3.weight(.semibold))
-                                        .frame(maxWidth: .infinity, minHeight: 64)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .accessibilityIdentifier("addScreenWord-\(candidate.word)")
-
-                                Button {
-                                    skipScreenWord(candidate.word)
-                                } label: {
-                                    Text("Skip")
-                                        .font(.title3.weight(.semibold))
-                                        .frame(maxWidth: .infinity, minHeight: 64)
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
-                }
-            }
-
-            if !captureCandidates.isEmpty {
-                Section("Words you type a lot") {
-                    ForEach(captureCandidates, id: \.word) { candidate in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(candidate.word)
-                                .font(.title2)
-                            Text("typed \(candidate.count) times")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 12) {
-                                Button {
-                                    addCapturedWord(candidate.word)
-                                } label: {
-                                    Text("Add")
-                                        .font(.title3.weight(.semibold))
-                                        .frame(maxWidth: .infinity, minHeight: 64)
-                                }
-                                .buttonStyle(.borderedProminent)
-
-                                Button {
-                                    skipCapturedWord(candidate.word)
-                                } label: {
-                                    Text("Skip")
-                                        .font(.title3.weight(.semibold))
-                                        .frame(maxWidth: .infinity, minHeight: 64)
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
-                }
+            Section {
+                Label("Words you type often, and names read from your screen, are added here on their own. Remove one and it stays gone.",
+                      systemImage: "wand.and.stars")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("My words and phrases") {
@@ -660,21 +572,6 @@ struct MyWordsView: View {
         skippedScreenWords = Set(store.array(forKey: "screenSkipped") as? [String] ?? [])
     }
 
-    private func addScreenWord(_ word: String) {
-        var words = freshMyWords()
-        let capitalized = word.capitalized
-        if !words.contains(where: { $0.caseInsensitiveCompare(capitalized) == .orderedSame }) {
-            words.append(capitalized)
-            store.set(words, forKey: "myWords")
-        }
-        myWords = words
-    }
-
-    private func skipScreenWord(_ word: String) {
-        skippedScreenWords.insert(word)
-        store.set(Array(skippedScreenWords), forKey: "screenSkipped")
-    }
-
     /// Reads myWords straight from the shared suite — never from @State —
     /// so a caller about to mutate and write back never clobbers a write
     /// the keyboard extension made in between this screen's last reload
@@ -694,32 +591,17 @@ struct MyWordsView: View {
         WordFiling.category(for: word)
     }
 
-    private func addCapturedWord(_ word: String) {
-        var words = freshMyWords()
-        if !words.contains(where: { $0.caseInsensitiveCompare(word) == .orderedSame }) {
-            words.append(word)
-            store.set(words, forKey: "myWords")
-        }
-        myWords = words
-
-        var counts = freshCaptureCounts()
-        counts.removeValue(forKey: word)
-        store.set(counts, forKey: "captureCounts")
-        captureCounts = counts
-    }
-
-    private func skipCapturedWord(_ word: String) {
-        var counts = freshCaptureCounts()
-        counts.removeValue(forKey: word)
-        store.set(counts, forKey: "captureCounts")
-        captureCounts = counts
-    }
-
     private func removeWord(_ word: String) {
         if armedWord == word {
             var words = freshMyWords()
             words.removeAll { $0.caseInsensitiveCompare(word) == .orderedSame }
             store.set(words, forKey: "myWords")
+            // Removing is the veto on automatic adding: without this the
+            // word is simply re-added the next time it crosses the
+            // threshold, and the user cannot win an argument with the app.
+            var blocked = Set(store.array(forKey: ScreenWords.blockedKey) as? [String] ?? [])
+            blocked.insert(word.lowercased())
+            store.set(Array(blocked), forKey: ScreenWords.blockedKey)
             myWords = words
             armedWord = nil
         } else {
