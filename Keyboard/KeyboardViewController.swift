@@ -384,6 +384,10 @@ final class KeyboardViewController: UIInputViewController {
                 }
             }
         }
+        // Reaching this line proves Full Access is granted — the app has no
+        // other way to know, so it reads this flag to tell the user whether
+        // screen learning can actually reach the keyboard.
+        shared.set(true, forKey: ScreenWords.keyboardAccessKey)
         return shared
     }()
 

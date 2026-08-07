@@ -9,14 +9,14 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "1,2"
-    CURRENT_PROJECT_VERSION: 6
+    CURRENT_PROJECT_VERSION: 7
     MARKETING_VERSION: "1.0"
     GENERATE_INFOPLIST_FILE: YES
 targets:
   Typikey:
     type: application
     platform: iOS
-    sources: [App]
+    sources: [App, Shared]
     info:
       path: App/Info.plist
       properties:
@@ -60,7 +60,7 @@ targets:
   TypikeyKeyboard:
     type: app-extension
     platform: iOS
-    sources: [Keyboard]
+    sources: [Keyboard, Shared]
     info:
       path: Keyboard/Info.plist
       properties:
@@ -85,7 +85,7 @@ targets:
   TypikeyBroadcast:
     type: app-extension
     platform: iOS
-    sources: [Broadcast]
+    sources: [Broadcast, Shared]
     info:
       path: Broadcast/Info.plist
       properties:

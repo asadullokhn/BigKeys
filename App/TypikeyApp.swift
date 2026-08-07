@@ -1,6 +1,7 @@
 import SwiftUI
 import ReplayKit
 import NaturalLanguage
+import Vision
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -219,9 +220,13 @@ private struct MyWordsNavCard: View {
 /// them. Nothing ever leaves the device.
 private struct ScreenLearningCard: View {
     private let store: UserDefaults =
-        UserDefaults(suiteName: "group.com.asadullokh.ch5.typikey") ?? .standard
+        UserDefaults(suiteName: ScreenWords.suiteName) ?? .standard
 
-    @State private var learnedCount = 0
+    @State private var learned: [(word: String, count: Int)] = []
+    @State private var sessionStarted = false
+    @State private var framesSeen = false
+    @State private var keyboardReady = false
+    @State private var selfTest: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -238,22 +243,43 @@ private struct ScreenLearningCard: View {
                 Spacer(minLength: 0)
             }
 
-            Text("While it's on, Typikey reads the words on your screen and suggests them when you type — names, places, whatever you're replying to. Everything stays on this iPad; nothing is ever uploaded. iOS shows a red indicator the whole time, and you can stop from the same button or Control Center.")
+            Text("While it's on, Typikey reads the words on your screen and suggests them when you type — names, places, whatever you're replying to. Everything stays on this device; nothing is ever uploaded. iOS shows a red indicator the whole time, and you can stop from the same button or Control Center.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            if learnedCount > 0 {
-                HStack {
-                    Text("\(learnedCount) words learned from your screen")
-                        .font(.footnote.weight(.medium))
-                    Spacer(minLength: 12)
-                    Button("Forget them", role: .destructive) {
-                        store.removeObject(forKey: "screenWords")
-                        store.removeObject(forKey: "screenWordsStamp")
-                        learnedCount = 0
-                    }
-                    .font(.footnote.weight(.semibold))
+            Divider()
+
+            // Each stage of the pipeline reports for itself, so a silent
+            // failure names which link broke instead of just doing nothing.
+            status("Broadcast started", ok: sessionStarted,
+                   noText: "Not started yet — tap the record button above")
+            status("Screen frames read", ok: framesSeen,
+                   noText: sessionStarted ? "Started, but no frames arrived" : "Waiting for a broadcast")
+            status("\(learned.count) words learned", ok: !learned.isEmpty,
+                   noText: "No words yet")
+            status("Keyboard can read them", ok: keyboardReady,
+                   noText: "Turn on Full Access: Settings → General → Keyboard → Keyboards → Typikey")
+
+            if !learned.isEmpty {
+                Text(learned.prefix(12).map(\.word).joined(separator: " · "))
+                    .font(.footnote.weight(.medium))
+                    .accessibilityIdentifier("screenWordsSample")
+                Button("Forget them", role: .destructive) {
+                    store.removeObject(forKey: ScreenWords.countsKey)
+                    store.removeObject(forKey: ScreenWords.stampKey)
+                    refresh()
                 }
+                .font(.footnote.weight(.semibold))
+            }
+
+            Button("Test the reader") { runSelfTest() }
+                .font(.footnote.weight(.semibold))
+                .accessibilityIdentifier("screenSelfTest")
+            if let selfTest {
+                Text(selfTest)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("screenSelfTestResult")
             }
         }
         .homeCardStyle()
@@ -263,8 +289,62 @@ private struct ScreenLearningCard: View {
         }
     }
 
+    private func status(_ label: String, ok: Bool, noText: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: ok ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(ok ? Color.green : Color.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label).font(.footnote.weight(.medium))
+                if !ok {
+                    Text(noText).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     private func refresh() {
-        learnedCount = (store.dictionary(forKey: "screenWords") as? [String: Int])?.count ?? 0
+        let counts = (store.dictionary(forKey: ScreenWords.countsKey) as? [String: Int]) ?? [:]
+        learned = counts.sorted { $0.value > $1.value }.map { (word: $0.key, count: $0.value) }
+        sessionStarted = store.double(forKey: "screenSessionStart") > 0
+        framesSeen = store.double(forKey: "screenLastFrame") > 0
+        // The keyboard writes this flag whenever it runs WITH Full Access —
+        // the only way the app can tell whether the grant is in place, since
+        // without it the keyboard cannot reach this container at all.
+        keyboardReady = store.bool(forKey: ScreenWords.keyboardAccessKey)
+    }
+
+    /// Runs the exact OCR path the broadcast extension uses — same request,
+    /// same tokenizer — against a rendered image, so the reader can be
+    /// proven on this device without starting a broadcast.
+    private func runSelfTest() {
+        let sample = "Ratna is bringing pizza to Singapore on Friday"
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 56), .foregroundColor: UIColor.black,
+        ]
+        // Size the canvas to the text: a fixed width would clip the tail of
+        // the sentence, and a clipped word looks exactly like an OCR miss.
+        let textSize = (sample as NSString).size(withAttributes: attributes)
+        let size = CGSize(width: ceil(textSize.width) + 80, height: ceil(textSize.height) + 80)
+        let image = UIGraphicsImageRenderer(size: size).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            (sample as NSString).draw(at: CGPoint(x: 40, y: 40), withAttributes: attributes)
+        }
+        guard let cgImage = image.cgImage else {
+            selfTest = "Could not render the test image."
+            return
+        }
+        let request = ScreenWords.makeRequest()
+        do {
+            try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+        } catch {
+            selfTest = "Reader failed: \(error.localizedDescription)"
+            return
+        }
+        let words = ScreenWords.words(from: request).sorted()
+        selfTest = words.isEmpty
+            ? "Reader found no words — the OCR step is not working on this device."
+            : "Reader works. From a test image it read: \(words.joined(separator: ", "))"
     }
 }
 
