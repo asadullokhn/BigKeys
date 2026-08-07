@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		07263B60294FBF334BC5BBAE /* ConversationDemoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64B8468DA9967648A6BC8DD7 /* ConversationDemoTests.swift */; };
 		279A952F2D8694A16DDE8465 /* ScreenLearningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C34EE826A9C2E88FA6D179E /* ScreenLearningTests.swift */; };
 		34DF27D384A8C18AD355C5F1 /* ScreenWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52ACB8836103B0ABB01D07BC /* ScreenWords.swift */; };
 		3CFD805A7C394D9A86940530 /* ScreenWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52ACB8836103B0ABB01D07BC /* ScreenWords.swift */; };
@@ -19,6 +20,7 @@
 		BD72207B7019C86BCF8699CE /* CompletionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE154DB166CA944192DDE2A3 /* CompletionEngine.swift */; };
 		BD7FFEE284ED5DFC50FA2351 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86125954B46BC2FC71586B57 /* SampleHandler.swift */; };
 		C5DE9CF6E675B6572A25B3F0 /* KeyboardHeightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D977763A87F89006584A3902 /* KeyboardHeightTests.swift */; };
+		C9B01D5AA3ED72DD91E5B3C2 /* ConversationDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C356DFA180B06CD6221686 /* ConversationDemoView.swift */; };
 		DE071B07D2A8FA05715A5ED8 /* TypikeyKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F83C0D6BAF2B10D4444DD9A7 /* TypikeyKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EED48B258A0595CE57451BAC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DBD94BC6DECDCB5E20AD5726 /* PrivacyInfo.xcprivacy */; };
 		F358D447B20F9F451E7AF138 /* TypikeyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA3846751FF38D84B3414E5 /* TypikeyApp.swift */; };
@@ -71,7 +73,9 @@
 		2F4B7442BDF523BAC5B0E4C2 /* PinnedFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedFrameTests.swift; sourceTree = "<group>"; };
 		52ACB8836103B0ABB01D07BC /* ScreenWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWords.swift; sourceTree = "<group>"; };
 		540443137A743CBC5FFF53C0 /* Typikey.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Typikey.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		64B8468DA9967648A6BC8DD7 /* ConversationDemoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationDemoTests.swift; sourceTree = "<group>"; };
 		671DF4A1D7A2DABAD334557F /* TypikeyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TypikeyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		73C356DFA180B06CD6221686 /* ConversationDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationDemoView.swift; sourceTree = "<group>"; };
 		7FA3846751FF38D84B3414E5 /* TypikeyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypikeyApp.swift; sourceTree = "<group>"; };
 		86125954B46BC2FC71586B57 /* SampleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHandler.swift; sourceTree = "<group>"; };
 		8A0596DADB8E2918F9CB0FF9 /* Typikey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Typikey.entitlements; sourceTree = "<group>"; };
@@ -125,6 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				238704140C8DFC7E10D738C7 /* Assets.xcassets */,
+				73C356DFA180B06CD6221686 /* ConversationDemoView.swift */,
 				F14E0151DBA04E506C934CB8 /* Info.plist */,
 				E6C422799418AAD787A25061 /* PrivacyInfo.xcprivacy */,
 				8A0596DADB8E2918F9CB0FF9 /* Typikey.entitlements */,
@@ -146,6 +151,7 @@
 		AF67B2AFBC51848C7E1E95BB /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				64B8468DA9967648A6BC8DD7 /* ConversationDemoTests.swift */,
 				D977763A87F89006584A3902 /* KeyboardHeightTests.swift */,
 				167A2498198387A80DD85FC1 /* MyWordsTests.swift */,
 				2F4B7442BDF523BAC5B0E4C2 /* PinnedFrameTests.swift */,
@@ -318,6 +324,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C9B01D5AA3ED72DD91E5B3C2 /* ConversationDemoView.swift in Sources */,
 				34DF27D384A8C18AD355C5F1 /* ScreenWords.swift in Sources */,
 				F358D447B20F9F451E7AF138 /* TypikeyApp.swift in Sources */,
 			);
@@ -346,6 +353,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				07263B60294FBF334BC5BBAE /* ConversationDemoTests.swift in Sources */,
 				C5DE9CF6E675B6572A25B3F0 /* KeyboardHeightTests.swift in Sources */,
 				9C862CD8CF1738B5038563A8 /* MyWordsTests.swift in Sources */,
 				FB44BAC1AC5A3F6C433CD88D /* PinnedFrameTests.swift in Sources */,
@@ -473,7 +481,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = Y7ZZ5G2T3Y;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -553,7 +561,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = Y7ZZ5G2T3Y;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

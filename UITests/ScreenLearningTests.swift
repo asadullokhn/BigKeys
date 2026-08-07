@@ -20,9 +20,15 @@ final class ScreenLearningTests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        // The reader test lives in the Diagnostics drawer — troubleshooting,
+        // not daily use — so open that first.
+        app.swipeUp()
+        let diagnostics = app.staticTexts["Diagnostics"]
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: 5), "Diagnostics section not found")
+        diagnostics.tap()
+
         let button = app.buttons["screenSelfTest"]
         XCTAssertTrue(button.waitForExistence(timeout: 5), "self-test button not found")
-        app.swipeUp()
         button.tap()
 
         let result = app.staticTexts["screenSelfTestResult"]

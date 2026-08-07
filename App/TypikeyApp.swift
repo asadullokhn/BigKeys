@@ -21,12 +21,41 @@ struct SetupView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                // Ordered by what someone actually needs, in order: prove it
+                // works, turn it on, make it yours, teach it, learn how it
+                // behaves — and only then the engine diagnostics, which used
+                // to sit at the very top above everything the user does.
                 VStack(alignment: .leading, spacing: 20) {
                     HeroHeader()
 
-                    EngineStatusSection()
-
                     TryItCard(practiceText: $practiceText)
+
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                step(1, "Open Settings")
+                                step(2, "General → Keyboard → Keyboards")
+                                step(3, "Add New Keyboard…")
+                                step(4, "Select Typikey")
+                                step(5, "Tap Typikey again and turn on Allow Full Access — this is what lets your own words and screen learning reach the keyboard")
+                            }
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Use it")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                step(1, "Open any app with a text field (Notes, Messages)")
+                                step(2, "Tap the text field, then hold the globe key")
+                                step(3, "Select Typikey")
+                            }
+                        }
+                        .padding(.top, 10)
+                    } label: {
+                        Label("Turn on Typikey", systemImage: "gearshape")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                    }
+                    .tint(.primary)
+                    .homeCardStyle()
 
                     NavigationLink {
                         MyWordsView()
@@ -37,27 +66,43 @@ struct SetupView: View {
 
                     ScreenLearningCard()
 
+                    NavigationLink {
+                        ConversationDemoView()
+                    } label: {
+                        HStack(spacing: 16) {
+                            Image(systemName: "bubble.left.and.text.bubble.right")
+                                .font(.title)
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 44, height: 44)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Practice conversation")
+                                    .font(.title3.weight(.semibold))
+                                Text("See screen learning work on a pretend chat — nothing is recorded")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .homeCardStyle()
+                        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
                     VStack(spacing: 12) {
                         DisclosureGroup {
-                            VStack(alignment: .leading, spacing: 14) {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    step(1, "Open Settings")
-                                    step(2, "General → Keyboard → Keyboards")
-                                    step(3, "Add New Keyboard…")
-                                    step(4, "Select Typikey")
-                                }
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("Use it")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                    step(1, "Open any app with a text field (Notes, Messages)")
-                                    step(2, "Tap the text field, then hold the globe key")
-                                    step(3, "Select Typikey")
-                                }
+                            VStack(alignment: .leading, spacing: 12) {
+                                Label("A word grid, like TouchChat: one tap inserts one whole word. Categories switch pages at the top.", systemImage: "square.grid.3x3")
+                                Label("Light keys write. Dark keys move you around the board or fix what you wrote.", systemImage: "circle.lefthalf.filled")
+                                Label("abc opens the letter keyboard — the fallback for words not in the grid, just like TouchChat's own.", systemImage: "keyboard")
+                                Label("Slide your finger across the keys — nothing happens until you lift. The key under your finger gets a blue ring.", systemImage: "hand.draw")
+                                Label("Accidental double-taps are ignored for half a second.", systemImage: "clock")
                             }
                             .padding(.top, 10)
                         } label: {
-                            Text("Set up the keyboard")
+                            Label("How it types", systemImage: "questionmark.circle")
                                 .font(.headline)
                                 .foregroundStyle(.primary)
                         }
@@ -65,15 +110,13 @@ struct SetupView: View {
                         .homeCardStyle()
 
                         DisclosureGroup {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Label("A word grid, like TouchChat: one tap inserts one whole word. Categories switch pages at the top.", systemImage: "square.grid.3x3")
-                                Label("abc opens the letter keyboard — the fallback for words not in the grid, just like TouchChat's own.", systemImage: "keyboard")
-                                Label("Slide your finger across the keys — nothing happens until you lift. The key under your finger lights up.", systemImage: "hand.draw")
-                                Label("Accidental double-taps are ignored for half a second.", systemImage: "clock")
+                            VStack(alignment: .leading, spacing: 18) {
+                                EngineStatusSection()
+                                ScreenReaderDiagnostics()
                             }
                             .padding(.top, 10)
                         } label: {
-                            Text("How it types")
+                            Label("Diagnostics", systemImage: "stethoscope")
                                 .font(.headline)
                                 .foregroundStyle(.primary)
                         }
@@ -223,47 +266,41 @@ private struct ScreenLearningCard: View {
         UserDefaults(suiteName: ScreenWords.suiteName) ?? .standard
 
     @State private var learned: [(word: String, count: Int)] = []
-    @State private var sessionStarted = false
-    @State private var framesSeen = false
     @State private var keyboardReady = false
-    @State private var selfTest: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 16) {
-                BroadcastPickerButton()
-                    .frame(width: 56, height: 56)
+            HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Learn from my screen")
                         .font(.title3.weight(.semibold))
-                    Text("Tap the record button, then Start Broadcast")
+                    Text("Tap Start, then Start Broadcast")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
+                BroadcastPickerButton()
+                    .frame(width: 130, height: 56)
             }
 
             Text("While it's on, Typikey reads the words on your screen and suggests them when you type — names, places, whatever you're replying to. Everything stays on this device; nothing is ever uploaded. iOS shows a red indicator the whole time, and you can stop from the same button or Control Center.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            Divider()
-
-            // Each stage of the pipeline reports for itself, so a silent
-            // failure names which link broke instead of just doing nothing.
-            status("Broadcast started", ok: sessionStarted,
-                   noText: "Not started yet — tap the record button above")
-            status("Screen frames read", ok: framesSeen,
-                   noText: sessionStarted ? "Started, but no frames arrived" : "Waiting for a broadcast")
-            status("\(learned.count) words learned", ok: !learned.isEmpty,
-                   noText: "No words yet")
-            status("Keyboard can read them", ok: keyboardReady,
-                   noText: "Turn on Full Access: Settings → General → Keyboard → Keyboards → Typikey")
-
             if !learned.isEmpty {
+                Divider()
+                Text("\(learned.count) words learned")
+                    .font(.footnote.weight(.semibold))
                 Text(learned.prefix(12).map(\.word).joined(separator: " · "))
-                    .font(.footnote.weight(.medium))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier("screenWordsSample")
+                if !keyboardReady {
+                    Label("The keyboard can't see these yet — turn on Allow Full Access in Settings.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Button("Forget them", role: .destructive) {
                     store.removeObject(forKey: ScreenWords.countsKey)
                     store.removeObject(forKey: ScreenWords.stampKey)
@@ -271,9 +308,53 @@ private struct ScreenLearningCard: View {
                 }
                 .font(.footnote.weight(.semibold))
             }
+        }
+        .homeCardStyle()
+        .onAppear(perform: refresh)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            refresh()
+        }
+    }
+
+    private func refresh() {
+        let counts = (store.dictionary(forKey: ScreenWords.countsKey) as? [String: Int]) ?? [:]
+        learned = counts.sorted { $0.value > $1.value }.map { (word: $0.key, count: $0.value) }
+        // The keyboard writes this flag whenever it runs WITH Full Access —
+        // the only way the app can tell whether the grant is in place, since
+        // without it the keyboard cannot reach this container at all.
+        keyboardReady = store.bool(forKey: ScreenWords.keyboardAccessKey)
+    }
+}
+
+/// Screen-learning troubleshooting, in the Diagnostics drawer rather than
+/// on the card: each stage of the pipeline reports for itself, so a silent
+/// failure names which link broke instead of just doing nothing. Daily use
+/// never needs this; a bad session does.
+private struct ScreenReaderDiagnostics: View {
+    private let store: UserDefaults =
+        UserDefaults(suiteName: ScreenWords.suiteName) ?? .standard
+
+    @State private var learnedCount = 0
+    @State private var sessionStarted = false
+    @State private var framesSeen = false
+    @State private var keyboardReady = false
+    @State private var selfTest: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Screen learning")
+                .font(.headline)
+
+            status("Broadcast started", ok: sessionStarted,
+                   noText: "Not started yet — use the record button on the card above")
+            status("Screen frames read", ok: framesSeen,
+                   noText: sessionStarted ? "Started, but no frames arrived" : "Waiting for a broadcast")
+            status("\(learnedCount) words learned", ok: learnedCount > 0, noText: "No words yet")
+            status("Keyboard can read them", ok: keyboardReady,
+                   noText: "Turn on Allow Full Access: Settings → General → Keyboard → Keyboards → Typikey")
 
             Button("Test the reader") { runSelfTest() }
-                .font(.footnote.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .accessibilityIdentifier("screenSelfTest")
             if let selfTest {
                 Text(selfTest)
@@ -282,11 +363,7 @@ private struct ScreenLearningCard: View {
                     .accessibilityIdentifier("screenSelfTestResult")
             }
         }
-        .homeCardStyle()
         .onAppear(perform: refresh)
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            refresh()
-        }
     }
 
     private func status(_ label: String, ok: Bool, noText: String) -> some View {
@@ -303,13 +380,9 @@ private struct ScreenLearningCard: View {
     }
 
     private func refresh() {
-        let counts = (store.dictionary(forKey: ScreenWords.countsKey) as? [String: Int]) ?? [:]
-        learned = counts.sorted { $0.value > $1.value }.map { (word: $0.key, count: $0.value) }
+        learnedCount = (store.dictionary(forKey: ScreenWords.countsKey) as? [String: Int])?.count ?? 0
         sessionStarted = store.double(forKey: "screenSessionStart") > 0
         framesSeen = store.double(forKey: "screenLastFrame") > 0
-        // The keyboard writes this flag whenever it runs WITH Full Access —
-        // the only way the app can tell whether the grant is in place, since
-        // without it the keyboard cannot reach this container at all.
         keyboardReady = store.bool(forKey: ScreenWords.keyboardAccessKey)
     }
 
@@ -348,20 +421,64 @@ private struct ScreenLearningCard: View {
     }
 }
 
-/// The system broadcast picker. Its internal button is the tap target;
-/// stretched to fill our frame so the target stays big.
+/// The system broadcast picker, wearing our own button.
+///
+/// `RPSystemBroadcastPickerView` draws its own icon, which renders as an
+/// invisible blank on iPadOS 26 — leaving the card with a hole where the
+/// only actionable control should be. So the picker itself is kept in the
+/// hierarchy (iOS allows no other way to start a broadcast) but hidden
+/// behind a proper button, whose tap is forwarded to the picker's internal
+/// button. If that internal button can't be found, the picker is shown as
+/// it is rather than leaving the user with nothing to press.
 private struct BroadcastPickerButton: UIViewRepresentable {
-    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
-        let picker = RPSystemBroadcastPickerView()
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+
+        let picker = RPSystemBroadcastPickerView(
+            frame: CGRect(x: 0, y: 0, width: 60, height: 60))
         picker.preferredExtension = "com.asadullokh.ch5.typikey.broadcast"
-        picker.showsMicrophoneButton = false
-        for case let button as UIButton in picker.subviews {
-            button.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        }
-        return picker
+        picker.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(picker)
+
+        let systemButton = Self.firstButton(in: picker)
+        picker.isHidden = systemButton != nil
+
+        var config = UIButton.Configuration.filled()
+        config.title = "Start"
+        config.image = UIImage(systemName: "record.circle")
+        config.imagePadding = 6
+        config.baseBackgroundColor = .systemRed
+        config.cornerStyle = .large
+        let button = UIButton(configuration: config)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.isHidden = systemButton == nil
+        button.addAction(UIAction { _ in
+            Self.firstButton(in: picker)?.sendActions(for: .touchUpInside)
+        }, for: .touchUpInside)
+        container.addSubview(button)
+
+        NSLayoutConstraint.activate([
+            button.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            button.topAnchor.constraint(equalTo: container.topAnchor),
+            button.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            picker.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            picker.topAnchor.constraint(equalTo: container.topAnchor),
+            picker.widthAnchor.constraint(equalToConstant: 60),
+            picker.heightAnchor.constraint(equalToConstant: 60),
+        ])
+        return container
     }
 
-    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
+    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    private static func firstButton(in view: UIView) -> UIButton? {
+        for subview in view.subviews {
+            if let button = subview as? UIButton { return button }
+            if let nested = firstButton(in: subview) { return nested }
+        }
+        return nil
+    }
 }
 
 /// Tremor-friendly "My Words" editor (Gilbert build, task G2). Reads and
