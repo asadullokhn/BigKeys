@@ -45,7 +45,13 @@ final class KeyboardHeightTests: XCTestCase {
 
         let baseline = practiceField(in: app).frame.maxY
         snapshot(name: "open-1-baseline")
-        XCTAssertGreaterThan(baseline, screenHeight * 0.2,
+        // The practice field is the first card now, and the scroll view
+        // parks it just under the navigation bar when the keyboard opens,
+        // so its absolute position is naturally high. What still cannot
+        // happen is the field being pushed off the top entirely, which is
+        // what a ballooning keyboard window did. The drift assertions
+        // below are the real regression guard.
+        XCTAssertGreaterThan(baseline, screenHeight * 0.1,
                              "field crushed to the top on first open — keyboard window oversized")
 
         // The reported reproduction: open, close, open again, repeatedly.

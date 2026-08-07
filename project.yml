@@ -9,7 +9,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "1,2"
-    CURRENT_PROJECT_VERSION: 8
+    CURRENT_PROJECT_VERSION: 9
     MARKETING_VERSION: "1.0"
     GENERATE_INFOPLIST_FILE: YES
 targets:
@@ -47,6 +47,8 @@ targets:
         embed: true
       - target: TypikeyBroadcast
         embed: true
+      - target: TypikeyShare
+        embed: true
   TypikeyUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -79,6 +81,32 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey.keyboard
     entitlements:
       path: Keyboard/TypikeyKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.asadullokh.ch5.typikey
+  TypikeyShare:
+    type: app-extension
+    platform: iOS
+    sources: [Share, Shared]
+    info:
+      path: Share/Info.plist
+      properties:
+        CFBundleDisplayName: Typikey
+        ITSAppUsesNonExemptEncryption: false
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsWebPageWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 4
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.asadullokh.ch5.typikey.share
+    entitlements:
+      path: Share/TypikeyShare.entitlements
       properties:
         com.apple.security.application-groups:
           - group.com.asadullokh.ch5.typikey

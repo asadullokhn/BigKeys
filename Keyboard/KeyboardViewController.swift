@@ -194,6 +194,22 @@ private let vocabulary: [Category] = [
         VocabWord("funny", ms: "kelakar", emoji: "😂", .descriptor), VocabWord("new", ms: "baru", emoji: "✨", .descriptor),
         VocabWord("finished", ms: "siap", emoji: "🏁", .descriptor), VocabWord("show you", ms: "tunjuk", emoji: "👀", .social),
     ]),
+    // Browsing is its own vocabulary: the words that move you around a page
+    // or a video are almost none of the words you use to talk to a person,
+    // and typing them letter by letter is exactly the cost this keyboard
+    // exists to remove.
+    Category(en: "Web", ms: "Web", words: [
+        VocabWord("search", ms: "cari", emoji: "🔍", .verb), VocabWord("open", ms: "buka", .verb),
+        VocabWord("watch", ms: "tonton", emoji: "📺", .verb), VocabWord("play", ms: "main", emoji: "▶️", .verb),
+        VocabWord("next", ms: "seterusnya", emoji: "⏭️", .descriptor), VocabWord("back", ms: "kembali", emoji: "◀️", .descriptor),
+        VocabWord("video", ms: "video", emoji: "🎬", .noun), VocabWord("music", ms: "muzik", emoji: "🎵", .noun),
+        VocabWord("news", ms: "berita", emoji: "📰", .noun), VocabWord("game", ms: "permainan", emoji: "🎮", .noun),
+        VocabWord("YouTube", emoji: "▶️", .noun), VocabWord("Google", emoji: "🔎", .noun),
+        VocabWord("link", ms: "pautan", emoji: "🔗", .noun), VocabWord("page", ms: "halaman", emoji: "📄", .noun),
+        VocabWord("share", ms: "kongsi", emoji: "📤", .verb), VocabWord("download", ms: "muat turun", emoji: "⬇️", .verb),
+        VocabWord("www.", .noun), VocabWord(".com", .noun),
+        VocabWord("how to", ms: "bagaimana", .question), VocabWord("what is", ms: "apa itu", .question),
+    ]),
     Category(en: "Chat", ms: "Sembang", words: [
         VocabWord("hello", ms: "hai", emoji: "👋", .social), VocabWord("bye", emoji: "👋", .social),
         VocabWord("please", ms: "tolong", emoji: "🙏", .social), VocabWord("thank you", ms: "terima kasih", emoji: "🙏", .social),
@@ -347,6 +363,16 @@ final class KeyboardViewController: UIInputViewController {
 
     private var keys: [Key] = []
     private var contentRowCount = 4
+
+    /// The form verb cells are currently showing, recomputed whenever the
+    /// text around the cursor changes. Held rather than derived on the fly
+    /// so a rebuild is only triggered when the form actually changes.
+    private var verbForm: Grammar.VerbForm = .base
+
+    /// Inflected label -> the vocabulary word it came from, so a relabelled
+    /// key keeps its color and emoji, and usage is counted against the base
+    /// word rather than scattering across "go", "going" and "goes".
+    private var inflectionBase: [String: String] = [:]
     private var level: Level = .home
     private var clearArmedAt: Date?
     private var lastIntentSignature: String?
@@ -630,8 +656,19 @@ final class KeyboardViewController: UIInputViewController {
         // count — the same reset-don't-count policy as every other
         // ambiguous path below.
         typedToken = ""
+        refreshVerbForms()
         updateSuggestions()
         requestPhraseCompletion()
+    }
+
+    /// Rebuilds only when the required verb form actually changed — a
+    /// rebuild on every keystroke would fight the explore-then-commit
+    /// slide, since rebuilding drops the highlight. `buildKeys` recomputes
+    /// the form itself, so this only decides whether to call it.
+    private func refreshVerbForms() {
+        guard lang == .en, isWordLevel else { return }
+        guard Grammar.verbForm(after: contextBefore()) != verbForm else { return }
+        buildKeys()
     }
 
     // MARK: Categories
@@ -678,22 +715,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func autoCategory(for word: String) -> String? {
         if let cached = autoFileCache[word] { return cached }
-        var result: String?
-        if word.rangeOfCharacter(from: .whitespaces) == nil {
-            let text = word.capitalized // name recognition needs the capital
-            let tagger = NLTagger(tagSchemes: [.nameType, .lexicalClass])
-            tagger.string = text
-            let (nameTag, _) = tagger.tag(at: text.startIndex, unit: .word, scheme: .nameType)
-            switch nameTag {
-            case .some(.personalName): result = "People"
-            case .some(.placeName): result = "Places"
-            default:
-                let lower = word.lowercased()
-                tagger.string = lower
-                let (classTag, _) = tagger.tag(at: lower.startIndex, unit: .word, scheme: .lexicalClass)
-                if classTag == .verb { result = "Actions" }
-            }
-        }
+        let result = WordFiling.category(for: word)
         autoFileCache[word] = result
         return result
     }
@@ -717,6 +739,11 @@ final class KeyboardViewController: UIInputViewController {
     /// allCategories() index of the Chat board (offset 1 for Recents).
     private var chatWordsIndex: Int {
         (vocabulary.firstIndex { $0.en == "Chat" } ?? 0) + 1
+    }
+
+    /// allCategories() index of the Web board (offset 1 for Recents).
+    private var webWordsIndex: Int {
+        (vocabulary.firstIndex { $0.en == "Web" } ?? 0) + 1
     }
 
     /// Spec: applied once when the keyboard attaches to a field; never
@@ -757,13 +784,21 @@ final class KeyboardViewController: UIInputViewController {
         switch textDocumentProxy.keyboardType {
         case .numberPad?, .decimalPad?, .phonePad?:
             level = .numbers; return
-        case .emailAddress?, .URL?, .webSearch?, .asciiCapable?:
+        case .emailAddress?, .URL?:
+            // An address is spelled, not chosen from a board.
+            level = .letters; return
+        case .webSearch?:
+            // A search box wants whole words — "YouTube", "how to" — far
+            // more than it wants letters, and letters are one tap away.
+            level = .words(webWordsIndex); return
+        case .asciiCapable?:
             level = .letters; return
         default:
             break
         }
         switch textDocumentProxy.returnKeyType {
-        case .search?, .google?, .yahoo?: level = .letters
+        case .google?, .yahoo?: level = .words(webWordsIndex)
+        case .search?: level = .words(webWordsIndex)
         case .send?: level = .words(chatWordsIndex)
         default: level = .home
         }
@@ -859,7 +894,18 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func wordCell(_ word: VocabWord) -> ContentCell {
-        let text = word.text(lang)
+        var text = word.text(lang)
+        // Verb keys follow the sentence: after "I am", `go` reads `going`.
+        // The cell does not move — this is the same relabel-in-place
+        // mechanism as the language switch (invariants 1 and 7). English
+        // only; Malay marks tense with particles, not inflection.
+        if word.wordClass == .verb, lang == .en {
+            let inflected = Grammar.inflect(text, as: verbForm)
+            if inflected != text {
+                inflectionBase[inflected] = text
+                text = inflected
+            }
+        }
         return ContentCell(word.wordClass == .punct ? .punct(text) : .word(text), text)
     }
 
@@ -877,24 +923,27 @@ final class KeyboardViewController: UIInputViewController {
             return chunk(cells, into: cols, maxRows: wordBoardMaxRows)
         case .categories:
             if cols >= 10 {
-                // Big targets suit the AAC use case: tile the full content
-                // area as 5x2 slots, each slot a 2x2 block of grid cells.
-                // 10 categories (Recents + 8 vocabulary + Mine) exactly
-                // fill all 10 slots.
-                var rows: [[ContentCell?]] = Array(repeating: Array(repeating: nil, count: cols), count: 4)
-                // Bounded at 10: the 5x2 tiling holds exactly 10 slots —
-                // an 11th category would index past rows' 4 rows and crash.
-                for (i, category) in allCategories().prefix(10).enumerated() {
-                    let slotRow = i / 5, slotCol = i % 5
-                    rows[slotRow * 2][slotCol * 2] = ContentCell(.toWords(i), category.name, colSpan: 2, rowSpan: 2)
+                // Big targets suit the AAC use case: five tiles across,
+                // each a 2x2 block. The number of bands follows the number
+                // of categories, so adding one (Web, say) grows the board
+                // downward instead of pushing Mine off the end — which is
+                // what a fixed 10-slot tiling used to do.
+                let categories = allCategories()
+                let bands = max(2, Int(ceil(Double(categories.count) / 5.0)))
+                var rows: [[ContentCell?]] = Array(
+                    repeating: Array(repeating: nil, count: cols), count: bands * 2)
+                for (i, category) in categories.enumerated() {
+                    rows[(i / 5) * 2][(i % 5) * 2] = ContentCell(
+                        .toWords(i), category.name, colSpan: 2, rowSpan: 2)
                 }
                 return rows
             } else if wordBoardMaxRows == 8 {
-                // Phone: two banks of five full-height tiles — all 10
-                // categories with targets as big as the 8-row board allows.
+                // Phone: five tiles across in full-height bands, same rule.
+                let categories = allCategories()
+                let bands = max(2, Int(ceil(Double(categories.count) / 5.0)))
                 var rows: [[ContentCell?]] = Array(
-                    repeating: Array(repeating: nil, count: cols), count: 8)
-                for (i, category) in allCategories().prefix(10).enumerated() {
+                    repeating: Array(repeating: nil, count: cols), count: bands * 4)
+                for (i, category) in categories.enumerated() {
                     rows[(i / 5) * 4][i % 5] = ContentCell(.toWords(i), category.name, rowSpan: 4)
                 }
                 return rows
@@ -1009,6 +1058,12 @@ final class KeyboardViewController: UIInputViewController {
         globeButton?.removeFromSuperview()
         globeButton = nil
 
+        // Recomputed here, on every rebuild, so the board is right no
+        // matter what caused it — a level change back from the letters
+        // keyboard, a re-show, or the sentence simply moving on.
+        verbForm = lang == .en ? Grammar.verbForm(after: contextBefore()) : .base
+        inflectionBase.removeAll()
+
         let content = contentRows(for: level)
         contentRowCount = content.count
 
@@ -1084,7 +1139,7 @@ final class KeyboardViewController: UIInputViewController {
         var background: UIColor
         switch role(of: action) {
         case .write:
-            if case .word(let w) = action, let word = vocabIndex[w] {
+            if case .word(let w) = action, let word = vocabIndex[w] ?? vocabIndex[inflectionBase[w] ?? w] {
                 background = word.wordClass.color
             } else if case .word = action {
                 background = WordClass.social.color // a word of the user's own
@@ -1109,7 +1164,7 @@ final class KeyboardViewController: UIInputViewController {
 
         switch action {
         case .word(let w):
-            if let word = vocabIndex[w], let emoji = word.emoji {
+            if let word = vocabIndex[w] ?? vocabIndex[inflectionBase[w] ?? w], let emoji = word.emoji {
                 // The WORD is what gets typed, so it leads; the emoji is a
                 // recognition cue above it, deliberately smaller. It used to
                 // be the other way round, which made the label hard to read.
@@ -1450,12 +1505,17 @@ final class KeyboardViewController: UIInputViewController {
         }
         textDocumentProxy.insertText(text + " ")
 
-        usageCounts[word, default: 0] += 1
+        // Count the base word, not the inflected label: "go", "goes" and
+        // "going" are one key and one habit, and Recents would otherwise
+        // fill up with three entries for the same cell.
+        let counted = inflectionBase[word] ?? word
+        usageCounts[counted, default: 0] += 1
         store.set(usageCounts, forKey: "usage")
         if !previous.isEmpty {
-            learnedBigrams["\(previous.lowercased())|\(word)", default: 0] += 1
+            learnedBigrams["\(previous.lowercased())|\(counted)", default: 0] += 1
             store.set(learnedBigrams, forKey: "bigrams")
         }
+        refreshVerbForms()
     }
 
     /// Punctuation attaches to the word before it: "hello ." → "hello. "

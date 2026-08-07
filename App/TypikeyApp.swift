@@ -131,6 +131,14 @@ struct SetupView: View {
             .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
         }
+        // Siri, Shortcuts and Back Tap land here: raise the broadcast sheet
+        // so a training session is one confirming tap away. The short delay
+        // lets the card's picker mount before it is asked to present.
+        .onReceive(NotificationCenter.default.publisher(for: .startScreenLearning)) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                BroadcastLauncher.shared.presentSheet()
+            }
+        }
     }
 
     private func step(_ n: Int, _ text: String) -> some View {
@@ -221,10 +229,8 @@ private struct TryItCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Try it here")
                 .font(.headline)
-            TextField("Tap here, hold the globe key, choose Typikey", text: $practiceText, axis: .vertical)
-                .font(.title3)
-                .lineLimit(4...8)
-                .frame(minHeight: 120, alignment: .topLeading)
+            PlainTextView(text: $practiceText,
+                          placeholder: "Tap here, hold the globe key, choose Typikey")
         }
         .homeCardStyle()
     }
@@ -284,6 +290,10 @@ private struct ScreenLearningCard: View {
             }
 
             Text("While it's on, Typikey reads the words on your screen and suggests them when you type — names, places, whatever you're replying to. Everything stays on this device; nothing is ever uploaded. iOS shows a red indicator the whole time, and you can stop from the same button or Control Center.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Text("A couple of minutes is usually enough — the words are kept for good. To start it without opening the app, add the Start screen learning shortcut to AssistiveTouch (Settings → Accessibility → Touch → AssistiveTouch → Customise Top Level Menu) so it can be reached with a pointer or joystick, or assign it to a switch under Switch Control.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -440,7 +450,8 @@ private struct BroadcastPickerButton: UIViewRepresentable {
         picker.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(picker)
 
-        let systemButton = Self.firstButton(in: picker)
+        BroadcastLauncher.shared.picker = picker
+        let systemButton = BroadcastLauncher.firstButton(in: picker)
         picker.isHidden = systemButton != nil
 
         var config = UIButton.Configuration.filled()
@@ -453,7 +464,7 @@ private struct BroadcastPickerButton: UIViewRepresentable {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.isHidden = systemButton == nil
         button.addAction(UIAction { _ in
-            Self.firstButton(in: picker)?.sendActions(for: .touchUpInside)
+            BroadcastLauncher.shared.presentSheet()
         }, for: .touchUpInside)
         container.addSubview(button)
 
@@ -471,14 +482,6 @@ private struct BroadcastPickerButton: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {}
-
-    private static func firstButton(in view: UIView) -> UIButton? {
-        for subview in view.subviews {
-            if let button = subview as? UIButton { return button }
-            if let nested = firstButton(in: subview) { return nested }
-        }
-        return nil
-    }
 }
 
 /// Tremor-friendly "My Words" editor (Gilbert build, task G2). Reads and
@@ -492,6 +495,8 @@ struct MyWordsView: View {
 
     @State private var myWords: [String] = []
     @State private var captureCounts: [String: Int] = [:]
+    @State private var screenWords: [String: Int] = [:]
+    @State private var skippedScreenWords: Set<String> = []
     @State private var armedWord: String?
     @State private var newWord = ""
 
@@ -503,8 +508,63 @@ struct MyWordsView: View {
             .sorted { $0.count > $1.count }
     }
 
+    /// Names and places the screen reader picked up that aren't on the
+    /// board yet. Deliberately offered rather than added: a browsing
+    /// session can surface hundreds of words, and silently turning any of
+    /// them into permanent keys would both flood the board and take the
+    /// decision away from the person whose board it is. One tap accepts,
+    /// and accepted words are auto-filed to People or Places from there.
+    private var screenCandidates: [(word: String, count: Int, category: String)] {
+        screenWords
+            .filter { candidate in
+                !myWords.contains { $0.caseInsensitiveCompare(candidate.key) == .orderedSame }
+                    && !skippedScreenWords.contains(candidate.key)
+            }
+            .compactMap { entry in
+                guard let category = WordFiling.category(for: entry.key),
+                      category != "Actions" else { return nil }
+                return (word: entry.key, count: entry.value, category: category)
+            }
+            .sorted { $0.count > $1.count }
+    }
+
     var body: some View {
         List {
+            if !screenCandidates.isEmpty {
+                Section("Seen on your screen") {
+                    ForEach(screenCandidates, id: \.word) { candidate in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(candidate.word.capitalized)
+                                .font(.title2)
+                            Text("a name the keyboard read on your screen — add it and it joins the \(candidate.category) page")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 12) {
+                                Button {
+                                    addScreenWord(candidate.word)
+                                } label: {
+                                    Text("Add")
+                                        .font(.title3.weight(.semibold))
+                                        .frame(maxWidth: .infinity, minHeight: 64)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .accessibilityIdentifier("addScreenWord-\(candidate.word)")
+
+                                Button {
+                                    skipScreenWord(candidate.word)
+                                } label: {
+                                    Text("Skip")
+                                        .font(.title3.weight(.semibold))
+                                        .frame(maxWidth: .infinity, minHeight: 64)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                }
+            }
+
             if !captureCandidates.isEmpty {
                 Section("Words you type a lot") {
                     ForEach(captureCandidates, id: \.word) { candidate in
@@ -596,6 +656,23 @@ struct MyWordsView: View {
     private func reload() {
         myWords = freshMyWords()
         captureCounts = freshCaptureCounts()
+        screenWords = (store.dictionary(forKey: ScreenWords.countsKey) as? [String: Int]) ?? [:]
+        skippedScreenWords = Set(store.array(forKey: "screenSkipped") as? [String] ?? [])
+    }
+
+    private func addScreenWord(_ word: String) {
+        var words = freshMyWords()
+        let capitalized = word.capitalized
+        if !words.contains(where: { $0.caseInsensitiveCompare(capitalized) == .orderedSame }) {
+            words.append(capitalized)
+            store.set(words, forKey: "myWords")
+        }
+        myWords = words
+    }
+
+    private func skipScreenWord(_ word: String) {
+        skippedScreenWords.insert(word)
+        store.set(Array(skippedScreenWords), forKey: "screenSkipped")
     }
 
     /// Reads myWords straight from the shared suite — never from @State —
@@ -610,24 +687,11 @@ struct MyWordsView: View {
         (store.dictionary(forKey: "captureCounts") as? [String: Int]) ?? [:]
     }
 
-    /// Mirrors the keyboard's auto-filing (person -> People, place ->
-    /// Places, verb -> Actions) so this screen can SAY where a word was
-    /// filed — the filing must be visible, never something to hunt for.
+    /// The keyboard files words with exactly this call, so what this screen
+    /// says about a word is what the board actually does — the filing must
+    /// be visible, never something to hunt for.
     static func autoCategory(for word: String) -> String? {
-        guard word.rangeOfCharacter(from: .whitespaces) == nil else { return nil }
-        let text = word.capitalized
-        let tagger = NLTagger(tagSchemes: [.nameType, .lexicalClass])
-        tagger.string = text
-        let (nameTag, _) = tagger.tag(at: text.startIndex, unit: .word, scheme: .nameType)
-        switch nameTag {
-        case .some(.personalName): return "People"
-        case .some(.placeName): return "Places"
-        default:
-            let lower = word.lowercased()
-            tagger.string = lower
-            let (classTag, _) = tagger.tag(at: lower.startIndex, unit: .word, scheme: .lexicalClass)
-            return classTag == .verb ? "Actions" : nil
-        }
+        WordFiling.category(for: word)
     }
 
     private func addCapturedWord(_ word: String) {
