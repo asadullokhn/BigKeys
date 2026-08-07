@@ -32,10 +32,13 @@ enum Palette {
 
     // MARK: Roles
 
-    /// Moves you somewhere: Home, Categories, abc/123, EN/MS, size, tiles.
-    static let navigate = UIColor(red: 0.78, green: 0.78, blue: 0.80, alpha: 1)
-    /// Fixes what you wrote: delete, word-delete, cursors, dismiss.
-    static let edit = UIColor(red: 0.78, green: 0.78, blue: 0.80, alpha: 1)
+    /// Moves you somewhere: Home, Categories, abc/123, EN/MS, size, cursors,
+    /// dismiss. Near-white with a blue glyph, as in the team's exports —
+    /// travelling is not the same act as erasing, and should not look it.
+    static let navigate = UIColor(red: 0.96, green: 0.96, blue: 0.97, alpha: 1)
+    /// Takes something away: delete, word-delete, clear all. The only grey
+    /// keys on the board, so "this removes something" reads at a glance.
+    static let erase = UIColor(red: 0.76, green: 0.77, blue: 0.79, alpha: 1)
     /// Finishes the message: Enter, and the send arrow.
     static let action = UIColor(red: 0.00, green: 0.48, blue: 1.00, alpha: 1)
     /// Clear all, once armed — the only irreversible key on the board.
@@ -66,11 +69,31 @@ enum Palette {
 
     /// Roles rendered dark enough to need white text.
     static func foreground(on background: UIColor) -> UIColor {
-        background == action || background == destructive ? onDark : onLight
+        if background == action || background == destructive { return onDark }
+        if background == navigate { return action } // blue glyphs on near-white
+        return onLight
     }
 }
 
 extension UIColor {
+    /// The two stops of a key's fill. The design gives every key a gentle
+    /// vertical gradient — lighter at the top — which is what stops a grid
+    /// of flat pastels from reading as a single sheet of colour.
+    var keyGradient: [CGColor] {
+        [lightened(by: 0.10).cgColor, darkened(by: 0.06).cgColor]
+    }
+
+    func lightened(by amount: CGFloat) -> UIColor { blended(toward: 1, amount: amount) }
+    func darkened(by amount: CGFloat) -> UIColor { blended(toward: 0, amount: amount) }
+
+    private func blended(toward target: CGFloat, amount: CGFloat) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard getRed(&r, green: &g, blue: &b, alpha: &a) else { return self }
+        return UIColor(red: r + (target - r) * amount,
+                       green: g + (target - g) * amount,
+                       blue: b + (target - b) * amount, alpha: a)
+    }
+
     /// Shifts a colour toward black or white by `amount` (0-1). Used for the
     /// focus state: light keys deepen, dark keys lift, so every key visibly
     /// reacts no matter where it sits on the scale.

@@ -104,6 +104,21 @@ enum Grammar {
     /// Auxiliaries that call for the past participle.
     private static let perfectAuxiliaries: Set<String> = ["have", "has", "had", "i've", "you've", "we've", "they've"]
 
+    /// The copula, which no suffix rule can ever produce and which every
+    /// AAC vendor uses as the canonical demonstration of this feature
+    /// ("after you write 'I', 'be' changes to 'am'"). It needs its own
+    /// table because it inflects for person as well as tense — the only
+    /// English verb that still does.
+    private static let copula: [VerbForm: [String: String]] = [
+        .base: ["i": "am", "he": "is", "she": "is", "it": "is",
+                "you": "are", "we": "are", "they": "are"],
+        .past: ["i": "was", "he": "was", "she": "was", "it": "was",
+                "you": "were", "we": "were", "they": "were"],
+    ]
+
+    private static let copulaForms: Set<String> =
+        ["be", "am", "is", "are", "was", "were", "been", "being"]
+
     /// Irregular verbs among the shipped vocabulary, plus the handful a user
     /// is most likely to add. Anything absent falls through to the regular
     /// rules below, which are correct for the vast majority of English verbs.
@@ -141,11 +156,22 @@ enum Grammar {
     /// Reads the tail of what has been typed and decides which form the next
     /// verb should take. Only the last one or two words matter, which keeps
     /// this cheap enough to run on every keystroke.
-    static func verbForm(after context: String) -> VerbForm {
-        let words = context
+    /// The subject the sentence is about, when the last word names one.
+    /// Only the copula needs this; every other English verb collapses
+    /// person into a single form.
+    static func subject(before context: String) -> String? {
+        words(in: context).last.flatMap { copula[.base]?[$0] != nil ? $0 : nil }
+    }
+
+    private static func words(in context: String) -> [String] {
+        context
             .lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "'")).inverted)
             .filter { !$0.isEmpty }
+    }
+
+    static func verbForm(after context: String) -> VerbForm {
+        let words = words(in: context)
         guard let last = words.last else { return .base }
 
         // "I am not going", "he is never eating" — an adverb between the
@@ -163,9 +189,24 @@ enum Grammar {
     /// The verb in the requested form. Falls back to the base word whenever
     /// a rule would be a guess — a wrong word in a fixed position is worse
     /// than an uninflected one.
-    static func inflect(_ verb: String, as form: VerbForm) -> String {
+    static func inflect(_ verb: String, as form: VerbForm, subject: String? = nil) -> String {
         let lower = verb.lowercased()
         guard !invariable.contains(lower), !verb.contains(" ") else { return verb }
+
+        // "be" is answered by the subject, not by the tense rules: after
+        // "I" it is "am", after "they" it is "are", after nothing at all it
+        // stays "be" ("I want to be").
+        if copulaForms.contains(lower) {
+            switch form {
+            case .progressive: return "being"
+            case .past:
+                if let subject, let was = copula[.past]?[subject] { return was }
+                return "been"
+            default:
+                if let subject, let now = copula[.base]?[subject] { return now }
+                return "be"
+            }
+        }
 
         if let forms = irregular[lower] {
             switch form {

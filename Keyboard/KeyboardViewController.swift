@@ -52,7 +52,7 @@ final class KeyboardViewController: UIInputViewController {
     private struct Key {
         let action: KeyAction
         let label: String
-        let view: UILabel
+        let view: KeyView
         let row: Int
         let col: Int // 0...contentColumns+1
         let colSpan: Int
@@ -114,6 +114,11 @@ final class KeyboardViewController: UIInputViewController {
     /// Whether verb keys follow the sentence. Every AAC product with this
     /// feature ships a way to turn it off; see `Preferences.smartGrammar`.
     private var smartGrammar = true
+
+    /// The subject the sentence is about, when the last word named one.
+    /// Only "be" needs it — it is the one English verb that still inflects
+    /// for person as well as tense.
+    private var verbSubject: String?
 
     /// The form verb cells are currently showing, recomputed whenever the
     /// text around the cursor changes. Held rather than derived on the fly
@@ -295,6 +300,7 @@ final class KeyboardViewController: UIInputViewController {
         reloadScreenWords()
         promoteFrequentWords()
         typedToken = ""
+        boardBackground.backgroundColor = isPrivate ? Palette.privateBoard : Palette.board
         heightConstraint?.constant = requestedHeight
         let signature = "\(textDocumentProxy.keyboardType?.rawValue ?? -1)|\(textDocumentProxy.returnKeyType?.rawValue ?? -1)"
         // Unconditional and unconditionally FIRST: reads and clears any
@@ -655,7 +661,7 @@ final class KeyboardViewController: UIInputViewController {
         // mechanism as the language switch (invariants 1 and 7). English
         // only; Malay marks tense with particles, not inflection.
         if word.wordClass == .verb, lang == .en, smartGrammar {
-            let inflected = Grammar.inflect(text, as: verbForm)
+            let inflected = Grammar.inflect(text, as: verbForm, subject: verbSubject)
             if inflected != text {
                 inflectionBase[inflected] = text
                 text = inflected
@@ -818,7 +824,9 @@ final class KeyboardViewController: UIInputViewController {
         // Recomputed here, on every rebuild, so the board is right no
         // matter what caused it — a level change back from the letters
         // keyboard, a re-show, or the sentence simply moving on.
-        verbForm = (lang == .en && smartGrammar) ? Grammar.verbForm(after: contextBefore()) : .base
+        let context = contextBefore()
+        verbForm = (lang == .en && smartGrammar) ? Grammar.verbForm(after: context) : .base
+        verbSubject = (lang == .en && smartGrammar) ? Grammar.subject(before: context) : nil
         inflectionBase.removeAll()
 
         let content = contentRows(for: level)
@@ -858,19 +866,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func addKey(_ def: (KeyAction, String), row: Int, col: Int, colSpan: Int = 1, rowSpan: Int = 1) {
-        let keyLabel = UILabel()
-        keyLabel.numberOfLines = 2
-        keyLabel.textAlignment = .center
-        keyLabel.adjustsFontSizeToFitWidth = true
-        // Was 0.5, which let "I use this to talk" shrink to roughly half the
-        // size of "I" on the same board — the longest labels became the
-        // hardest to read. Wrapping to a second line first keeps every key
-        // within one comfortable size band.
-        keyLabel.lineBreakMode = .byWordWrapping
-        keyLabel.minimumScaleFactor = 0.7
-        keyLabel.layer.cornerRadius = 14
-        keyLabel.layer.masksToBounds = true
-        keyLabel.isUserInteractionEnabled = false
+        let keyLabel = KeyView()
         style(keyLabel, action: def.0, label: def.1, highlighted: false)
         trackingView.addSubview(keyLabel)
         keys.append(Key(action: def.0, label: def.1, view: keyLabel, row: row, col: col, colSpan: colSpan, rowSpan: rowSpan))
@@ -879,7 +875,7 @@ final class KeyboardViewController: UIInputViewController {
     /// Which of the three jobs a key does. The role decides its color, and
     /// the color is the only thing the user needs to read to know whether a
     /// key will write, travel, or undo.
-    private enum KeyRole { case write, navigate, edit, action }
+    private enum KeyRole { case write, navigate, erase, action }
 
     private func role(of action: KeyAction) -> KeyRole {
         switch action {
@@ -887,14 +883,15 @@ final class KeyboardViewController: UIInputViewController {
             return .write
         case .ret:
             return .action // Enter finishes the message; the design's one blue key
-        case .home, .toCategories, .toWords, .toLetters, .toNumbers, .language, .size, .shift:
+        case .home, .toCategories, .toWords, .toLetters, .toNumbers, .language,
+             .size, .shift, .cursorLeft, .cursorRight, .dismiss:
             return .navigate
-        case .delete, .deleteWord, .clearAll, .cursorLeft, .cursorRight, .dismiss:
-            return .edit
+        case .delete, .deleteWord, .clearAll:
+            return .erase
         }
     }
 
-    private func style(_ label: UILabel, action: KeyAction, label text: String, highlighted: Bool) {
+    private func style(_ label: KeyView, action: KeyAction, label text: String, highlighted: Bool) {
         var background: UIColor
         switch role(of: action) {
         case .write:
@@ -909,19 +906,16 @@ final class KeyboardViewController: UIInputViewController {
             background = Palette.navigate
         case .action:
             background = Palette.action
-        case .edit:
+        case .erase:
             // Armed clear-all is the one irreversible key; it announces
             // itself in red rather than relying on the label change alone.
-            background = (isClearAllArmed(action)) ? Palette.destructive : Palette.edit
+            background = isClearAllArmed(action) ? Palette.destructive : Palette.erase
         }
 
         let foreground = Palette.foreground(on: background)
-        label.backgroundColor = highlighted ? background.shifted(by: 0.18) : background
+        label.paint(fill: background, focused: highlighted)
         label.textColor = foreground
-        // Every key carries a hairline so two pale cells never merge into
-        // one target; the focus ring simply thickens and colours it.
-        label.layer.borderWidth = highlighted ? 4 : 1
-        label.layer.borderColor = (highlighted ? Palette.focus : Palette.keyBorder).cgColor
+        label.lines = role(of: action) == .write ? 3 : 1
 
         switch action {
         case .word(let w):
